@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { BarChart3, CheckCircle2, ChevronDown, Download, HardDrive, LayoutGrid, MoreHorizontal, Plus, Rows3 } from "lucide-react";
+import { BarChart3, CheckCircle2, ChevronDown, Download, HardDrive, LayoutGrid, MoreHorizontal, Plus, Rows3, UsersRound } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { ArchiveDialog } from "@/components/board/archive-dialog";
 import { BoardCanvas } from "@/components/board/board-canvas";
 import { BoardDialog } from "@/components/board/board-dialog";
 import { TaskModal } from "@/components/board/task-modal";
 import { TaskTable } from "@/components/board/task-table";
+import { TeamDialog } from "@/components/board/team-dialog";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { useBoardStore } from "@/store/use-board-store";
@@ -32,10 +33,12 @@ export function DashboardApp() {
   const [boardDialogOpen, setBoardDialogOpen] = useState(false);
   const [managedBoardId, setManagedBoardId] = useState<string | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [teamOpen, setTeamOpen] = useState(false);
   const activeBoardId = useBoardStore((state) => state.activeBoardId);
   const board = useBoardStore((state) => state.boards[activeBoardId]);
   const lists = useBoardStore((state) => state.lists);
   const tasks = useBoardStore((state) => state.tasks);
+  const employees = useBoardStore((state) => state.employees);
 
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
@@ -62,8 +65,8 @@ export function DashboardApp() {
   }, [boardTasks]);
 
   const exportWorkspace = () => {
-    const { boards, lists: allLists, tasks: allTasks, activeBoardId: currentBoardId } = useBoardStore.getState();
-    const payload = JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), activeBoardId: currentBoardId, boards, lists: allLists, tasks: allTasks }, null, 2);
+    const { boards, lists: allLists, tasks: allTasks, employees: allEmployees, activeBoardId: currentBoardId } = useBoardStore.getState();
+    const payload = JSON.stringify({ version: 2, exportedAt: new Date().toISOString(), activeBoardId: currentBoardId, boards, lists: allLists, tasks: allTasks, employees: allEmployees }, null, 2);
     const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
     const link = document.createElement("a");
     link.href = url;
@@ -95,6 +98,7 @@ export function DashboardApp() {
               <div className="stat"><BarChart3 size={16} /><span><b>{stats.total}</b> {pluralize(stats.total, ["задача", "задачи", "задач"])}</span></div>
               <div className="stat success"><CheckCircle2 size={16} /><span><b>{stats.done}</b> {pluralize(stats.done, ["готова", "готовы", "готово"])}</span></div>
               <div className="stat saved"><HardDrive size={16} /><span>Сохранено</span></div>
+              <button className="button secondary team-button" onClick={() => setTeamOpen(true)} aria-label={`Сотрудники: ${Object.keys(employees).length}`}><UsersRound size={15} /><span>{Object.keys(employees).length} {pluralize(Object.keys(employees).length, ["сотрудник", "сотрудника", "сотрудников"])}</span></button>
               <button className="button secondary invite-button" onClick={exportWorkspace}><Download size={15} />Экспорт</button>
             </div>
           </section>
@@ -110,6 +114,7 @@ export function DashboardApp() {
       </div>
       {activeTaskId && <TaskModal key={activeTaskId} taskId={activeTaskId} onClose={() => setActiveTaskId(null)} />}
       <BoardDialog key={`${managedBoardId ?? "new"}-${boardDialogOpen}`} open={boardDialogOpen} boardId={managedBoardId} onClose={() => setBoardDialogOpen(false)} />
+      <TeamDialog open={teamOpen} onClose={() => setTeamOpen(false)} />
       <ArchiveDialog open={archiveOpen} onClose={() => setArchiveOpen(false)} />
       <Toaster theme={dark ? "dark" : "light"} position="bottom-right" richColors closeButton />
     </div>

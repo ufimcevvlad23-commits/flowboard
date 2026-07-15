@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Archive, GripVertical, MoreHorizontal, Plus, Trash2, X } from "lucide-react";
+import { Archive, GripVertical, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useBoardStore } from "@/store/use-board-store";
@@ -38,12 +38,28 @@ export function ListColumn({ listId, boardId, tasks, onOpenTask }: ListColumnPro
     toast.success("Задача создана");
   };
 
+  if (list.collapsed) {
+    return (
+      <section ref={sortable.setNodeRef} style={style} className={cn("list-column collapsed", sortable.isDragging && "list-dragging")}>
+        <header className="collapsed-list-header">
+          <button className="drag-handle" {...sortable.attributes} {...sortable.listeners} aria-label={`Перетащить список ${list.title}`}><GripVertical size={15} /></button>
+          <button className="collapsed-list-main" onClick={() => updateList(listId, { collapsed: false })} aria-label={`Развернуть список ${list.title}`} title="Развернуть колонку">
+            <PanelLeftOpen size={16} />
+            <span>{list.title}</span>
+            <b>{tasks.length}</b>
+          </button>
+        </header>
+      </section>
+    );
+  }
+
   return (
     <section ref={sortable.setNodeRef} style={style} className={cn("list-column", sortable.isDragging && "list-dragging")}>
       <header className="list-header">
         <button className="drag-handle" {...sortable.attributes} {...sortable.listeners} aria-label={`Перетащить список ${list.title}`}><GripVertical size={16} /></button>
         <input value={list.title} onChange={(event) => updateList(listId, { title: event.target.value })} aria-label="Название списка" />
         <span className="list-count">{tasks.length}</span>
+        <button className="icon-button small collapse-list-button" onClick={() => updateList(listId, { collapsed: true })} aria-label={`Свернуть список ${list.title}`} title="Свернуть колонку"><PanelLeftClose size={16} /></button>
         <div className="list-menu-wrap">
           <button className="icon-button small" onClick={() => setMenuOpen(!menuOpen)} aria-label="Действия со списком"><MoreHorizontal size={17} /></button>
           {menuOpen && <div className="mini-menu">

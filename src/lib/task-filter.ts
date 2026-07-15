@@ -28,11 +28,14 @@ export function taskMatches(task: Task, search: string, filters: Filters, listTi
 }
 
 export function sortTasks(items: Task[], sort: TaskSort) {
-  if (sort === "manual") return items;
+  const active = items.filter((task) => !task.closed);
+  const closed = items.filter((task) => task.closed);
+  if (sort === "manual") return [...active, ...closed];
   const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
-  return [...items].sort((a, b) => {
+  const sortGroup = (group: Task[]) => [...group].sort((a, b) => {
     if (sort === "title") return a.title.localeCompare(b.title, "ru");
     if (sort === "priority") return priorityOrder[a.priority] - priorityOrder[b.priority];
     return (a.dueDate ?? "9999-12-31").localeCompare(b.dueDate ?? "9999-12-31");
   });
+  return [...sortGroup(active), ...sortGroup(closed)];
 }

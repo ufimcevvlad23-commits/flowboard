@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Archive, CalendarDays, MessageSquare, Pin, Save, Trash2 } from "lucide-react";
+import { Archive, CalendarDays, CircleCheck, MessageSquare, Pin, RotateCcw, Save, Trash2, UserRoundCheck } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
-import { priorityMeta, statusMeta } from "@/lib/utils";
+import { employeeColor, employeeInitials, priorityMeta, statusMeta } from "@/lib/utils";
 import { useBoardStore } from "@/store/use-board-store";
 import type { Priority, TaskDraft, TaskStatus } from "@/types/board";
 
@@ -20,11 +20,15 @@ export function TaskModal({ taskId, onClose }: TaskModalProps) {
   const updateTask = useBoardStore((state) => state.updateTask);
   const deleteTask = useBoardStore((state) => state.deleteTask);
   const addComment = useBoardStore((state) => state.addComment);
-  const [draft, setDraft] = useState<TaskDraft>(() => task ? ({ title: task.title, description: task.description, priority: task.priority, status: task.status, dueDate: task.dueDate, labels: task.labels, notes: task.notes }) : ({ title: "", description: "", priority: "medium", status: "backlog", labels: [], notes: "" }));
+  const toggleTaskClosed = useBoardStore((state) => state.toggleTaskClosed);
+  const employees = useBoardStore((state) => state.employees);
+  const [draft, setDraft] = useState<TaskDraft>(() => task ? ({ title: task.title, description: task.description, priority: task.priority, status: task.status, dueDate: task.dueDate, labels: task.labels, assigneeIds: task.assigneeIds ?? [], notes: task.notes }) : ({ title: "", description: "", priority: "medium", status: "backlog", labels: [], assigneeIds: [], notes: "" }));
   const [comment, setComment] = useState("");
   const [labelsText, setLabelsText] = useState(task?.labels.join(", ") ?? "");
 
   if (!task) return null;
+  const employeeList = Object.values(employees).sort((a, b) => a.name.localeCompare(b.name, "ru"));
+  const toggleAssignee = (employeeId: string) => setDraft({ ...draft, assigneeIds: draft.assigneeIds.includes(employeeId) ? draft.assigneeIds.filter((id) => id !== employeeId) : [...draft.assigneeIds, employeeId] });
 
   const save = () => {
     if (!draft.title.trim()) { toast.error("Введите название задачи"); return; }
@@ -45,6 +49,13 @@ export function TaskModal({ taskId, onClose }: TaskModalProps) {
             <label className="field"><span>Дедлайн</span><div className="input-icon"><CalendarDays size={16} /><input type="date" value={draft.dueDate ?? ""} onChange={(event) => setDraft({ ...draft, dueDate: event.target.value || undefined })} /></div></label>
             <label className="field"><span>Метки через запятую</span><input value={labelsText} onChange={(event) => setLabelsText(event.target.value)} placeholder="UX, Важно" /></label>
           </div>
+          <div className="field assignee-field">
+            <span><UserRoundCheck size={13} />Ответственные</span>
+            {employeeList.length > 0 ? <div className="assignee-picker">{employeeList.map((employee) => {
+              const selected = draft.assigneeIds.includes(employee.id);
+              return <label className={selected ? "selected" : ""} key={employee.id}><input type="checkbox" checked={selected} onChange={() => toggleAssignee(employee.id)} /><span className="employee-avatar" style={{ background: employeeColor(employee.id) }}>{employeeInitials(employee.name)}</span><span><strong>{employee.name}</strong>{employee.email && <small>{employee.email}</small>}</span><i>{selected ? "Назначен" : "Назначить"}</i></label>;
+            })}</div> : <div className="assignee-empty">Сначала добавьте сотрудников через кнопку «Сотрудники» на доске.</div>}
+          </div>
           <label className="field"><span>Вложения и заметки</span><textarea rows={3} value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder="Ссылки, файлы или рабочие заметки..." /></label>
         </div>
         <aside className="activity-panel">
@@ -59,6 +70,7 @@ export function TaskModal({ taskId, onClose }: TaskModalProps) {
       <footer className="modal-actions task-actions">
         <div>
           <button className="button ghost" onClick={() => { updateTask(task.id, { pinned: !task.pinned }); toast.success(task.pinned ? "Задача откреплена" : "Задача закреплена"); }}><Pin size={15} />{task.pinned ? "Открепить" : "Закрепить"}</button>
+          <button className={`button ghost ${task.closed ? "reopen-task" : "close-task"}`} onClick={() => { toggleTaskClosed(task.id); toast.success(task.closed ? "Задача снова открыта" : "Задача закрыта и перемещена вниз"); onClose(); }}>{task.closed ? <RotateCcw size={15} /> : <CircleCheck size={15} />}{task.closed ? "Открыть снова" : "Закрыть задачу"}</button>
           <button className="button ghost" onClick={() => { updateTask(task.id, { archived: true }); toast.success("Задача в архиве"); onClose(); }}><Archive size={15} />В архив</button>
           <button className="button ghost danger-text" onClick={() => { if (window.confirm("Удалить задачу без возможности восстановления?")) { deleteTask(task.id); toast.success("Задача удалена"); onClose(); } }}><Trash2 size={15} />Удалить</button>
         </div>

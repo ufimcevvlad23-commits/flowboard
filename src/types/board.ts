@@ -7,6 +7,12 @@ export interface Comment {
   text: string;
   createdAt: string;
 }
+export interface Employee {
+  id: string;
+  name: string;
+  email?: string;
+  createdAt: string;
+}
 export interface Task {
   id: string;
   title: string;
@@ -15,9 +21,11 @@ export interface Task {
   status: TaskStatus;
   dueDate?: string;
   labels: string[];
+  assigneeIds: string[];
   comments: Comment[];
   notes: string;
   pinned: boolean;
+  closed: boolean;
   archived: boolean;
   createdAt: string;
 }
@@ -26,6 +34,7 @@ export interface List {
   id: string;
   title: string;
   taskIds: string[];
+  collapsed: boolean;
   archived: boolean;
 }
 
@@ -42,6 +51,7 @@ export interface WorkspaceData {
   boards: Record<string, Board>;
   lists: Record<string, List>;
   tasks: Record<string, Task>;
+  employees: Record<string, Employee>;
   activeBoardId: string;
 }
 
@@ -52,6 +62,7 @@ export interface TaskDraft {
   status: TaskStatus;
   dueDate?: string;
   labels: string[];
+  assigneeIds: string[];
   notes: string;
 }
 

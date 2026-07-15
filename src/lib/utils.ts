@@ -25,3 +25,13 @@ export function pluralize(value: number, forms: [string, string, string]) {
   if (mod10 >= 2 && mod10 <= 4) return forms[1];
   return forms[2];
 }
+
+export function employeeInitials(name: string) {
+  return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toLocaleUpperCase("ru") ?? "").join("");
+}
+
+export function employeeColor(id: string) {
+  const colors = ["#7567ff", "#d85d82", "#3c9a82", "#d28b3c", "#397ec7", "#9a62c7"];
+  const index = [...id].reduce((total, char) => total + char.charCodeAt(0), 0) % colors.length;
+  return colors[index];
+}
