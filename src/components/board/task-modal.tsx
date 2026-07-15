@@ -102,7 +102,6 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines }: TaskMo
             })}</div> : <div className="assignee-empty">Нет активных сотрудников для назначения.</div>}
             {deletedAssignees.length > 0 && <div className="deleted-assignee-note">Удалённые сотрудники будут сняты с задачи после сохранения: {deletedAssignees.map((employee) => employee.name).join(", ")}.</div>}
           </div>
-          <label className="field"><span>Вложения и заметки</span><textarea rows={3} value={draft.notes} readOnly={!canEdit} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder="Ссылки, файлы или рабочие заметки..." /></label>
         </div>
         <aside className="activity-panel">
           <div className="activity-heading"><MessageSquare size={16} /><span>Обсуждение</span><b>{task.comments.length}</b></div>
