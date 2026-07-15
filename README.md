@@ -62,12 +62,13 @@ pytest -q
 Для production сервис разворачивается как отдельный Vercel-проект, а не внутри проекта Next.js `flowboard`. Vercel автоматически распознаёт `app/main.py` как FastAPI entrypoint. В production обязательно задайте `DATABASE_URL` на постоянную PostgreSQL/Neon-базу: локальная SQLite подходит только для разработки, поскольку файловая система serverless-функции не является постоянным хранилищем.
 
 ```powershell
+Copy-Item pyproject.vercel.toml pyproject.toml
 vercel link
 vercel env add DATABASE_URL production
 vercel --prod
 ```
 
-Драйвер `psycopg` подключён в `requirements.txt`; адреса `postgres://` и `postgresql://` автоматически нормализуются для SQLAlchemy/psycopg 3.
+`pyproject.vercel.toml` содержит явный FastAPI entrypoint и production-зависимости. При отдельном деплое скопируйте его как `pyproject.toml`; отдельное имя не позволяет Vercel-проекту Flowboard ошибочно определить Python как основной framework. Драйвер `psycopg` подключён в `requirements.txt`; адреса `postgres://` и `postgresql://` автоматически нормализуются для SQLAlchemy/psycopg 3.
 
 Production-ready канбан-приложение для управления проектами, списками и задачами. Рабочее пространство защищено серверной авторизацией и хранится в Neon Postgres.
 
