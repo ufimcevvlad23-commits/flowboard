@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { BarChart3, CheckCircle2, ChevronDown, LayoutGrid, MoreHorizontal, Plus, Rows3, Users } from "lucide-react";
+import { BarChart3, CheckCircle2, ChevronDown, Download, HardDrive, LayoutGrid, MoreHorizontal, Plus, Rows3 } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { ArchiveDialog } from "@/components/board/archive-dialog";
 import { BoardCanvas } from "@/components/board/board-canvas";
 import { BoardDialog } from "@/components/board/board-dialog";
 import { TaskModal } from "@/components/board/task-modal";
+import { TaskTable } from "@/components/board/task-table";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { useBoardStore } from "@/store/use-board-store";
+import { pluralize } from "@/lib/utils";
+import type { TaskSort } from "@/lib/task-filter";
 import type { Filters } from "@/types/board";
 
 const defaultFilters: Filters = { priorities: [], statuses: [], label: "", due: "all" };
@@ -23,7 +26,8 @@ export function DashboardApp() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [dark, setDark] = useState(() => typeof window === "undefined" ? true : localStorage.getItem("flowboard-theme") !== "light");
   const [compact, setCompact] = useState(false);
-  const [sort, setSort] = useState<"manual" | "due" | "priority" | "title">("manual");
+  const [sort, setSort] = useState<TaskSort>("manual");
+  const [viewMode, setViewMode] = useState<"board" | "list">("board");
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [boardDialogOpen, setBoardDialogOpen] = useState(false);
   const [managedBoardId, setManagedBoardId] = useState<string | null>(null);
@@ -49,10 +53,25 @@ export function DashboardApp() {
     localStorage.setItem("flowboard-theme", dark ? "dark" : "light");
   }, [dark]);
 
+  const boardTasks = useMemo(() => board?.listIds.flatMap((id) => lists[id]?.taskIds ?? []).map((id) => tasks[id]).filter((task) => task && !task.archived) ?? [], [board, lists, tasks]);
   const stats = useMemo(() => {
-    const boardTasks = board?.listIds.flatMap((id) => lists[id]?.taskIds ?? []).map((id) => tasks[id]).filter((task) => task && !task.archived) ?? [];
     return { total: boardTasks.length, done: boardTasks.filter((task) => task.status === "done").length };
-  }, [board, lists, tasks]);
+  }, [boardTasks]);
+  const availableLabels = useMemo(() => {
+    return [...new Set(boardTasks.flatMap((task) => task.labels))].sort((a, b) => a.localeCompare(b, "ru"));
+  }, [boardTasks]);
+
+  const exportWorkspace = () => {
+    const { boards, lists: allLists, tasks: allTasks, activeBoardId: currentBoardId } = useBoardStore.getState();
+    const payload = JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), activeBoardId: currentBoardId, boards, lists: allLists, tasks: allTasks }, null, 2);
+    const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `flowboard-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("Резервная копия скачана");
+  };
 
   if (!mounted) return <div className="app-loading"><div className="loading-logo">F</div><div className="loading-line" /><span>Загружаем рабочее пространство…</span></div>;
 
@@ -65,7 +84,7 @@ export function DashboardApp() {
       <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateBoard={() => { setManagedBoardId(null); setBoardDialogOpen(true); }} onManageBoard={(id) => { setManagedBoardId(id); setBoardDialogOpen(true); }} onOpenArchive={() => setArchiveOpen(true)} />
       {mobileOpen && <button className="mobile-overlay" onClick={() => setMobileOpen(false)} aria-label="Закрыть меню" />}
       <div className="workspace">
-        <Topbar search={search} onSearch={setSearch} filters={filters} onFilters={setFilters} filterOpen={filterOpen} onFilterOpen={setFilterOpen} dark={dark} onThemeToggle={() => setDark(!dark)} onMobileMenu={() => setMobileOpen(true)} />
+        <Topbar search={search} onSearch={setSearch} filters={filters} onFilters={setFilters} filterOpen={filterOpen} onFilterOpen={setFilterOpen} dark={dark} onThemeToggle={() => setDark(!dark)} onMobileMenu={() => setMobileOpen(true)} labels={availableLabels} onNotifications={() => toast.info("Новых уведомлений нет")} />
         <main className="board-view">
           <section className="board-header">
             <div className="board-title-block">
@@ -73,20 +92,20 @@ export function DashboardApp() {
               <div><div className="board-title-row"><h1>{board.title}</h1><button className="icon-button small" onClick={() => { setManagedBoardId(board.id); setBoardDialogOpen(true); }} aria-label="Настройки доски"><MoreHorizontal size={18} /></button></div><p>{board.description}</p></div>
             </div>
             <div className="board-summary">
-              <div className="stat"><BarChart3 size={16} /><span><b>{stats.total}</b> задач</span></div>
-              <div className="stat success"><CheckCircle2 size={16} /><span><b>{stats.done}</b> готово</span></div>
-              <div className="member-stack"><span>А</span><span>М</span><span>К</span><button><Plus size={13} /></button></div>
-              <button className="button secondary invite-button" onClick={() => toast.info("Совместная работа появится при подключении backend")}><Users size={15} />Поделиться</button>
+              <div className="stat"><BarChart3 size={16} /><span><b>{stats.total}</b> {pluralize(stats.total, ["задача", "задачи", "задач"])}</span></div>
+              <div className="stat success"><CheckCircle2 size={16} /><span><b>{stats.done}</b> {pluralize(stats.done, ["готова", "готовы", "готово"])}</span></div>
+              <div className="stat saved"><HardDrive size={16} /><span>Сохранено</span></div>
+              <button className="button secondary invite-button" onClick={exportWorkspace}><Download size={15} />Экспорт</button>
             </div>
           </section>
           <section className="view-toolbar">
-            <div className="view-tabs"><button className="active"><LayoutGrid size={15} />Доска</button><button onClick={() => toast.info("Режим таблицы запланирован")}><Rows3 size={15} />Список</button></div>
+            <div className="view-tabs"><button className={viewMode === "board" ? "active" : ""} onClick={() => setViewMode("board")}><LayoutGrid size={15} />Доска</button><button className={viewMode === "list" ? "active" : ""} onClick={() => setViewMode("list")}><Rows3 size={15} />Список</button></div>
             <div className="toolbar-right">
               <label className="sort-select">Сортировка<select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)}><option value="manual">Вручную</option><option value="due">По дедлайну</option><option value="priority">По приоритету</option><option value="title">По названию</option></select><ChevronDown size={14} /></label>
-              <button className={`icon-button ${compact ? "selected" : ""}`} onClick={() => setCompact(!compact)} aria-label="Переключить плотность"><Rows3 size={17} /></button>
+              <button className={`icon-button ${compact ? "selected" : ""}`} onClick={() => setCompact(!compact)} aria-label="Переключить плотность" disabled={viewMode === "list"}><Rows3 size={17} /></button>
             </div>
           </section>
-          <BoardCanvas boardId={board.id} search={search} filters={filters} onOpenTask={setActiveTaskId} sort={sort} />
+          {viewMode === "board" ? <BoardCanvas boardId={board.id} search={search} filters={filters} onOpenTask={setActiveTaskId} sort={sort} /> : <TaskTable boardId={board.id} search={search} filters={filters} onOpenTask={setActiveTaskId} sort={sort} />}
         </main>
       </div>
       {activeTaskId && <TaskModal key={activeTaskId} taskId={activeTaskId} onClose={() => setActiveTaskId(null)} />}

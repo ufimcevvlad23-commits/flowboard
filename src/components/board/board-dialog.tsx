@@ -26,7 +26,7 @@ export function BoardDialog({ open, boardId, onClose }: BoardDialogProps) {
   const submit = () => {
     if (!title.trim()) { toast.error("Введите название доски"); return; }
     if (boardId) { updateBoard(boardId, { title: title.trim(), description: description.trim(), color }); toast.success("Доска обновлена"); }
-    else { createBoard(title.trim(), color); toast.success("Доска создана"); }
+    else { createBoard(title.trim(), color, description.trim()); toast.success("Доска создана"); }
     onClose();
   };
 
