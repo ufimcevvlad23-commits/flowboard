@@ -76,6 +76,7 @@ export function SelectMenu({ value, options, onChange, ariaLabel, disabled = fal
     const closeEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
+      event.stopImmediatePropagation();
       setOpen(false);
       triggerRef.current?.focus();
     };
