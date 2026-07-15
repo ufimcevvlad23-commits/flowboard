@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { BarChart3, CheckCircle2, ChevronDown, Download, HardDrive, LayoutGrid, MoreHorizontal, Plus, Rows3, UsersRound } from "lucide-react";
+import { ChevronDown, Download, HardDrive, LayoutGrid, MoreHorizontal, Plus, Rows3, UsersRound } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { ArchiveDialog } from "@/components/board/archive-dialog";
 import { BoardCanvas } from "@/components/board/board-canvas";
@@ -83,9 +83,6 @@ export function DashboardApp({ initialSnapshot }: { initialSnapshot: WorkspaceSn
   }, [dark]);
 
   const boardTasks = useMemo(() => board?.listIds.flatMap((id) => lists[id]?.taskIds ?? []).map((id) => tasks[id]).filter((task) => task && !task.archived) ?? [], [board, lists, tasks]);
-  const stats = useMemo(() => {
-    return { total: boardTasks.length, done: boardTasks.filter((task) => task.status === "done").length };
-  }, [boardTasks]);
   const availableLabels = useMemo(() => {
     return [...new Set(boardTasks.flatMap((task) => task.labels))].sort((a, b) => a.localeCompare(b, "ru"));
   }, [boardTasks]);
@@ -121,8 +118,6 @@ export function DashboardApp({ initialSnapshot }: { initialSnapshot: WorkspaceSn
               <div><div className="board-title-row"><h1>{board.title}</h1>{access.canEditWorkspace && <button className="icon-button small" onClick={() => { setManagedBoardId(board.id); setBoardDialogOpen(true); }} aria-label="Настройки доски"><MoreHorizontal size={18} /></button>}</div><p>{board.description}</p></div>
             </div>
             <div className="board-summary">
-              <div className="stat"><BarChart3 size={16} /><span><b>{stats.total}</b> {pluralize(stats.total, ["задача", "задачи", "задач"])}</span></div>
-              <div className="stat success"><CheckCircle2 size={16} /><span><b>{stats.done}</b> {pluralize(stats.done, ["готова", "готовы", "готово"])}</span></div>
               <div className={`stat saved ${saveError ? "save-failed" : ""}`} title={saveError ?? undefined}><HardDrive size={16} /><span>{saveError ? "Ошибка сохранения" : saving ? "Сохраняем…" : "Сохранено"}</span></div>
               {currentUser.role !== "guest" && <button className="button secondary team-button" onClick={() => setTeamOpen(true)} aria-label={`Активные сотрудники: ${Object.values(employees).filter((employee) => employee.status === "active").length}`}><UsersRound size={15} /><span>{Object.values(employees).filter((employee) => employee.status === "active").length} {pluralize(Object.values(employees).filter((employee) => employee.status === "active").length, ["сотрудник", "сотрудника", "сотрудников"])}</span></button>}
               {access.canEditWorkspace && <button className="button secondary invite-button" onClick={exportWorkspace}><Download size={15} />Экспорт</button>}
