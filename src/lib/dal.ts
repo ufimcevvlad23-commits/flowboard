@@ -10,7 +10,8 @@ type EmployeeRow = {
   login: string;
   email: string | null;
   status: "active" | "deleted";
-  role: "admin" | "member";
+  role: "admin" | "member" | "guest";
+  can_edit_deadlines: boolean;
   created_at: string | Date;
   deleted_at: string | Date | null;
 };
@@ -25,6 +26,7 @@ export function employeeDto(row: EmployeeRow): Employee {
     email: row.email ?? undefined,
     status: row.status,
     role: row.role,
+    canEditDeadlines: row.can_edit_deadlines,
     createdAt: new Date(row.created_at).toISOString(),
     deletedAt: row.deleted_at ? new Date(row.deleted_at).toISOString() : undefined,
   };
@@ -33,7 +35,7 @@ export function employeeDto(row: EmployeeRow): Employee {
 export async function getEmployeeDtos() {
   const sql = getSql();
   const rows = await sql`
-    SELECT id, name, login, email, status, role, created_at, deleted_at
+    SELECT id, name, login, email, status, role, can_edit_deadlines, created_at, deleted_at
     FROM employees
     ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END, name ASC
   ` as EmployeeRow[];
@@ -44,7 +46,10 @@ export async function getWorkspaceSnapshotFor(user: SessionUser): Promise<Worksp
   const sql = getSql();
   const rows = await sql`SELECT data, version FROM workspaces WHERE id = 'main' LIMIT 1` as WorkspaceRow[];
   if (!rows[0]) throw new Error("Workspace is not initialized");
-  const employees = await getEmployeeDtos();
+  const employeeDtos = await getEmployeeDtos();
+  const employees = user.role === "guest"
+    ? Object.fromEntries(Object.entries(employeeDtos).map(([id, employee]) => [id, { ...employee, login: "", email: undefined }]))
+    : employeeDtos;
   const data = rows[0].data;
   const tasks = Object.fromEntries(Object.entries(data.tasks ?? {}).map(([id, task]) => [id, {
     ...task,

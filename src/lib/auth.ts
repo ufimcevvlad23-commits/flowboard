@@ -15,7 +15,8 @@ type SessionRow = {
   name: string;
   login: string;
   email: string | null;
-  role: "admin" | "member";
+  role: "admin" | "member" | "guest";
+  can_edit_deadlines: boolean;
 };
 
 export async function hashPassword(password: string, salt = randomBytes(16).toString("base64url")) {
@@ -38,7 +39,7 @@ function tokenHash(token: string) {
 }
 
 function toSessionUser(row: SessionRow): SessionUser {
-  return { id: row.id, name: row.name, login: row.login, email: row.email ?? undefined, role: row.role };
+  return { id: row.id, name: row.name, login: row.login, email: row.email ?? undefined, role: row.role, canEditDeadlines: row.can_edit_deadlines };
 }
 
 export async function getSessionUser(): Promise<SessionUser | null> {
@@ -46,7 +47,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   if (!token) return null;
   const sql = getSql();
   const rows = await sql`
-    SELECT e.id, e.name, e.login, e.email, e.role
+    SELECT e.id, e.name, e.login, e.email, e.role, e.can_edit_deadlines
     FROM sessions s
     INNER JOIN employees e ON e.id = s.employee_id
     WHERE s.token_hash = ${tokenHash(token)}

@@ -13,12 +13,15 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { useBoardStore } from "@/store/use-board-store";
 import { pluralize } from "@/lib/utils";
+import { getAccess } from "@/lib/permissions";
 import type { TaskSort } from "@/lib/task-filter";
-import type { Filters, WorkspaceSnapshot } from "@/types/board";
+import type { Filters, SessionUser, WorkspaceSnapshot } from "@/types/board";
 
 const defaultFilters: Filters = { priorities: [], statuses: [], label: "", due: "all" };
 
 export function DashboardApp({ initialSnapshot }: { initialSnapshot: WorkspaceSnapshot }) {
+  const currentUser = initialSnapshot.currentUser;
+  const access = getAccess(currentUser);
   const mounted = useSyncExternalStore(() => () => undefined, () => true, () => false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -52,12 +55,16 @@ export function DashboardApp({ initialSnapshot }: { initialSnapshot: WorkspaceSn
     const verify = async () => {
       const response = await fetch("/api/auth/session", { cache: "no-store" });
       if (response.status === 401) window.location.assign("/login");
+      if (response.ok) {
+        const result = await response.json() as { user?: SessionUser };
+        if (result.user && (result.user.role !== currentUser.role || result.user.canEditDeadlines !== currentUser.canEditDeadlines)) window.location.reload();
+      }
     };
     const interval = window.setInterval(() => void verify(), 10_000);
     const onVisibility = () => document.visibilityState === "visible" && void verify();
     document.addEventListener("visibilitychange", onVisibility);
     return () => { window.clearInterval(interval); document.removeEventListener("visibilitychange", onVisibility); };
-  }, []);
+  }, [currentUser.canEditDeadlines, currentUser.role]);
 
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
@@ -98,27 +105,27 @@ export function DashboardApp({ initialSnapshot }: { initialSnapshot: WorkspaceSn
   if (!mounted || !hydrated) return <div className="app-loading"><div className="loading-logo">F</div><div className="loading-line" /><span>Загружаем защищённое рабочее пространство…</span></div>;
 
   if (!board) return (
-    <main className="empty-workspace"><div className="brand-mark large">F</div><h1>Создайте первую доску</h1><p>Организуйте проект в списках и двигайте задачи к результату.</p><button className="button primary" onClick={() => { setManagedBoardId(null); setBoardDialogOpen(true); }}><Plus size={16} />Создать доску</button><BoardDialog key={`new-${boardDialogOpen}`} open={boardDialogOpen} boardId={null} onClose={() => setBoardDialogOpen(false)} /></main>
+    <main className="empty-workspace"><div className="brand-mark large">F</div><h1>{access.canEditWorkspace ? "Создайте первую доску" : "Нет доступных досок"}</h1><p>{access.canEditWorkspace ? "Организуйте проект в списках и двигайте задачи к результату." : "Попросите администратора добавить доску или изменить ваш уровень доступа."}</p>{access.canEditWorkspace && <><button className="button primary" onClick={() => { setManagedBoardId(null); setBoardDialogOpen(true); }}><Plus size={16} />Создать доску</button><BoardDialog key={`new-${boardDialogOpen}`} open={boardDialogOpen} boardId={null} onClose={() => setBoardDialogOpen(false)} /></>}</main>
   );
 
   return (
     <div className={`app-shell ${sidebarCollapsed ? "sidebar-is-collapsed" : ""} ${compact ? "compact-mode" : ""} ${mobileOpen ? "mobile-sidebar-open" : ""}`}>
-      <Sidebar currentUser={initialSnapshot.currentUser} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateBoard={() => { setManagedBoardId(null); setBoardDialogOpen(true); }} onManageBoard={(id) => { setManagedBoardId(id); setBoardDialogOpen(true); }} onOpenArchive={() => setArchiveOpen(true)} />
+      <Sidebar currentUser={currentUser} canEdit={access.canEditWorkspace} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateBoard={() => { setManagedBoardId(null); setBoardDialogOpen(true); }} onManageBoard={(id) => { setManagedBoardId(id); setBoardDialogOpen(true); }} onOpenArchive={() => setArchiveOpen(true)} />
       {mobileOpen && <button className="mobile-overlay" onClick={() => setMobileOpen(false)} aria-label="Закрыть меню" />}
       <div className="workspace">
-        <Topbar currentUser={initialSnapshot.currentUser} search={search} onSearch={setSearch} filters={filters} onFilters={setFilters} filterOpen={filterOpen} onFilterOpen={setFilterOpen} dark={dark} onThemeToggle={() => setDark(!dark)} onMobileMenu={() => setMobileOpen(true)} labels={availableLabels} onNotifications={() => toast.info("Новых уведомлений нет")} />
+        <Topbar currentUser={currentUser} search={search} onSearch={setSearch} filters={filters} onFilters={setFilters} filterOpen={filterOpen} onFilterOpen={setFilterOpen} dark={dark} onThemeToggle={() => setDark(!dark)} onMobileMenu={() => setMobileOpen(true)} labels={availableLabels} onNotifications={() => toast.info("Новых уведомлений нет")} />
         <main className="board-view">
           <section className="board-header">
             <div className="board-title-block">
               <div className="board-icon" style={{ background: board.color }}><LayoutGrid size={20} /></div>
-              <div><div className="board-title-row"><h1>{board.title}</h1><button className="icon-button small" onClick={() => { setManagedBoardId(board.id); setBoardDialogOpen(true); }} aria-label="Настройки доски"><MoreHorizontal size={18} /></button></div><p>{board.description}</p></div>
+              <div><div className="board-title-row"><h1>{board.title}</h1>{access.canEditWorkspace && <button className="icon-button small" onClick={() => { setManagedBoardId(board.id); setBoardDialogOpen(true); }} aria-label="Настройки доски"><MoreHorizontal size={18} /></button>}</div><p>{board.description}</p></div>
             </div>
             <div className="board-summary">
               <div className="stat"><BarChart3 size={16} /><span><b>{stats.total}</b> {pluralize(stats.total, ["задача", "задачи", "задач"])}</span></div>
               <div className="stat success"><CheckCircle2 size={16} /><span><b>{stats.done}</b> {pluralize(stats.done, ["готова", "готовы", "готово"])}</span></div>
               <div className={`stat saved ${saveError ? "save-failed" : ""}`} title={saveError ?? undefined}><HardDrive size={16} /><span>{saveError ? "Ошибка сохранения" : saving ? "Сохраняем…" : "Сохранено"}</span></div>
-              <button className="button secondary team-button" onClick={() => setTeamOpen(true)} aria-label={`Активные сотрудники: ${Object.values(employees).filter((employee) => employee.status === "active").length}`}><UsersRound size={15} /><span>{Object.values(employees).filter((employee) => employee.status === "active").length} {pluralize(Object.values(employees).filter((employee) => employee.status === "active").length, ["сотрудник", "сотрудника", "сотрудников"])}</span></button>
-              <button className="button secondary invite-button" onClick={exportWorkspace}><Download size={15} />Экспорт</button>
+              {currentUser.role !== "guest" && <button className="button secondary team-button" onClick={() => setTeamOpen(true)} aria-label={`Активные сотрудники: ${Object.values(employees).filter((employee) => employee.status === "active").length}`}><UsersRound size={15} /><span>{Object.values(employees).filter((employee) => employee.status === "active").length} {pluralize(Object.values(employees).filter((employee) => employee.status === "active").length, ["сотрудник", "сотрудника", "сотрудников"])}</span></button>}
+              {access.canEditWorkspace && <button className="button secondary invite-button" onClick={exportWorkspace}><Download size={15} />Экспорт</button>}
             </div>
           </section>
           <section className="view-toolbar">
@@ -128,13 +135,13 @@ export function DashboardApp({ initialSnapshot }: { initialSnapshot: WorkspaceSn
               <button className={`icon-button ${compact ? "selected" : ""}`} onClick={() => setCompact(!compact)} aria-label="Переключить плотность" disabled={viewMode === "list"}><Rows3 size={17} /></button>
             </div>
           </section>
-          {viewMode === "board" ? <BoardCanvas boardId={board.id} search={search} filters={filters} onOpenTask={setActiveTaskId} sort={sort} /> : <TaskTable boardId={board.id} search={search} filters={filters} onOpenTask={setActiveTaskId} sort={sort} />}
+          {viewMode === "board" ? <BoardCanvas boardId={board.id} search={search} filters={filters} onOpenTask={setActiveTaskId} sort={sort} canEdit={access.canEditWorkspace} /> : <TaskTable boardId={board.id} search={search} filters={filters} onOpenTask={setActiveTaskId} sort={sort} />}
         </main>
       </div>
-      {activeTaskId && <TaskModal key={activeTaskId} taskId={activeTaskId} onClose={() => setActiveTaskId(null)} />}
-      <BoardDialog key={`${managedBoardId ?? "new"}-${boardDialogOpen}`} open={boardDialogOpen} boardId={managedBoardId} onClose={() => setBoardDialogOpen(false)} />
-      <TeamDialog open={teamOpen} onClose={() => setTeamOpen(false)} canManage={initialSnapshot.currentUser.role === "admin"} currentUserId={initialSnapshot.currentUser.id} />
-      <ArchiveDialog open={archiveOpen} onClose={() => setArchiveOpen(false)} />
+      {activeTaskId && <TaskModal key={activeTaskId} taskId={activeTaskId} onClose={() => setActiveTaskId(null)} canEdit={access.canEditWorkspace} canEditDeadlines={access.canEditDeadlines} />}
+      {access.canEditWorkspace && <BoardDialog key={`${managedBoardId ?? "new"}-${boardDialogOpen}`} open={boardDialogOpen} boardId={managedBoardId} onClose={() => setBoardDialogOpen(false)} />}
+      {currentUser.role !== "guest" && <TeamDialog open={teamOpen} onClose={() => setTeamOpen(false)} canManage={access.canManageEmployees} currentUserId={currentUser.id} />}
+      <ArchiveDialog open={archiveOpen} onClose={() => setArchiveOpen(false)} canEdit={access.canEditWorkspace} />
       <Toaster theme={dark ? "dark" : "light"} position="bottom-right" richColors closeButton />
     </div>
   );

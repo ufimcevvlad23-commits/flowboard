@@ -7,16 +7,18 @@ import type { SessionUser } from "@/types/board";
 
 interface SidebarProps {
   currentUser: SessionUser;
+  canEdit: boolean;
   collapsed: boolean;
   onToggle: () => void;
   onCreateBoard: () => void;
   onManageBoard: (id: string) => void;
   onOpenArchive: () => void;
 }
-export function Sidebar({ currentUser, collapsed, onToggle, onCreateBoard, onManageBoard, onOpenArchive }: SidebarProps) {
+export function Sidebar({ currentUser, canEdit, collapsed, onToggle, onCreateBoard, onManageBoard, onOpenArchive }: SidebarProps) {
   const boards = useBoardStore((state) => state.boards);
   const activeBoardId = useBoardStore((state) => state.activeBoardId);
   const setActiveBoard = useBoardStore((state) => state.setActiveBoard);
+  const setActiveBoardLocal = useBoardStore((state) => state.setActiveBoardLocal);
 
   return (
     <aside className={cn("sidebar", collapsed && "collapsed")}>
@@ -30,29 +32,29 @@ export function Sidebar({ currentUser, collapsed, onToggle, onCreateBoard, onMan
 
       <nav className="sidebar-nav" aria-label="Основная навигация">
         <div className="nav-item active"><LayoutDashboard size={18} /><span>Мои доски</span></div>
-        <button className="nav-item" onClick={onOpenArchive}><Archive size={18} /><span>Архив</span></button>
+        {canEdit && <button className="nav-item" onClick={onOpenArchive}><Archive size={18} /><span>Архив</span></button>}
       </nav>
 
       <div className="sidebar-section">
-        {!collapsed && <div className="section-heading"><span>Рабочее пространство</span><button className="icon-button" onClick={onCreateBoard} aria-label="Создать доску"><Plus size={15} /></button></div>}
+        {!collapsed && <div className="section-heading"><span>Рабочее пространство</span>{canEdit && <button className="icon-button" onClick={onCreateBoard} aria-label="Создать доску"><Plus size={15} /></button>}</div>}
         <div className="board-nav-list">
           {Object.values(boards).map((board) => (
             <div className={cn("board-nav-row", activeBoardId === board.id && "selected")} key={board.id}>
-              <button className="board-nav-main" onClick={() => setActiveBoard(board.id)} title={board.title}>
+              <button className="board-nav-main" onClick={() => canEdit ? setActiveBoard(board.id) : setActiveBoardLocal(board.id)} title={board.title}>
                 <span className="board-dot" style={{ background: board.color }} />
                 <span>{board.title}</span>
               </button>
-              {!collapsed && <button className="board-settings" onClick={() => onManageBoard(board.id)} aria-label={`Настроить доску ${board.title}`}><Settings2 size={14} /></button>}
+              {!collapsed && canEdit && <button className="board-settings" onClick={() => onManageBoard(board.id)} aria-label={`Настроить доску ${board.title}`}><Settings2 size={14} /></button>}
             </div>
           ))}
-          {collapsed && <button className="add-collapsed" onClick={onCreateBoard} aria-label="Создать доску"><Plus size={17} /></button>}
+          {collapsed && canEdit && <button className="add-collapsed" onClick={onCreateBoard} aria-label="Создать доску"><Plus size={17} /></button>}
         </div>
       </div>
 
       {!collapsed && (
         <div className="sidebar-footer">
           <div className="avatar">{employeeInitials(currentUser.name)}</div>
-          <div><strong>{currentUser.name}</strong><span>{currentUser.role === "admin" ? "Администратор" : "Сотрудник"}</span></div>
+          <div><strong>{currentUser.name}</strong><span>{currentUser.role === "admin" ? "Администратор" : currentUser.role === "guest" ? "Гость" : "Пользователь"}</span></div>
         </div>
       )}
     </aside>

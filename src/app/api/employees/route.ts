@@ -11,12 +11,14 @@ export async function POST(request: Request) {
   const user = await getSessionUser();
   if (!user) return noStoreJson({ error: "Требуется вход" }, { status: 401 });
   if (user.role !== "admin") return noStoreJson({ error: "Недостаточно прав" }, { status: 403 });
-  let body: { name?: unknown; login?: unknown; email?: unknown; password?: unknown };
+  let body: { name?: unknown; login?: unknown; email?: unknown; password?: unknown; role?: unknown; canEditDeadlines?: unknown };
   try { body = await request.json(); } catch { return noStoreJson({ error: "Некорректный запрос" }, { status: 400 }); }
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const login = typeof body.login === "string" ? body.login.trim().toLocaleLowerCase("ru") : "";
   const email = typeof body.email === "string" ? body.email.trim().toLocaleLowerCase("ru") : "";
   const password = typeof body.password === "string" ? body.password : "";
+  const role = body.role === "admin" || body.role === "guest" ? body.role : "member";
+  const canEditDeadlines = role === "admin" ? true : role === "guest" ? false : body.canEditDeadlines !== false;
   if (name.length < 2 || name.length > 100) return noStoreJson({ error: "Имя должно содержать от 2 до 100 символов" }, { status: 400 });
   if (!validLogin(login)) return noStoreJson({ error: "Проверьте email или логин" }, { status: 400 });
   if (email && !/^\S+@\S+\.\S+$/.test(email)) return noStoreJson({ error: "Проверьте email сотрудника" }, { status: 400 });
@@ -25,9 +27,9 @@ export async function POST(request: Request) {
   const sql = getSql();
   try {
     const rows = await sql`
-      INSERT INTO employees (id, name, login, email, password_hash, password_salt, role, status)
-      VALUES (${`employee-${randomUUID()}`}, ${name}, ${login}, ${email || null}, ${passwordData.hash}, ${passwordData.salt}, 'member', 'active')
-      RETURNING id, name, login, email, status, role, created_at, deleted_at
+      INSERT INTO employees (id, name, login, email, password_hash, password_salt, role, can_edit_deadlines, status)
+      VALUES (${`employee-${randomUUID()}`}, ${name}, ${login}, ${email || null}, ${passwordData.hash}, ${passwordData.salt}, ${role}, ${canEditDeadlines}, 'active')
+      RETURNING id, name, login, email, status, role, can_edit_deadlines, created_at, deleted_at
     ` as EmployeeRow[];
     return noStoreJson({ employee: employeeDto(rows[0]) }, { status: 201 });
   } catch (error) {

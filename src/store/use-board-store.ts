@@ -13,6 +13,7 @@ interface BoardState extends WorkspaceData {
   saveError: string | null;
   hydrateWorkspace: (snapshot: WorkspaceSnapshot) => void;
   setActiveBoard: (id: string) => void;
+  setActiveBoardLocal: (id: string) => void;
   createBoard: (title: string, color?: string, description?: string) => string;
   updateBoard: (id: string, updates: Partial<Pick<Board, "title" | "description" | "color">>) => void;
   deleteBoard: (id: string) => void;
@@ -97,6 +98,7 @@ export const useBoardStore = create<BoardState>((set, get) => {
     saveError: null,
     hydrateWorkspace: (snapshot) => set({ ...snapshot.workspace, version: snapshot.version, hydrated: true, saving: false, saveError: null }),
     setActiveBoard: (activeBoardId) => mutate({ activeBoardId }),
+    setActiveBoardLocal: (activeBoardId) => set({ activeBoardId }),
     createBoard: (title, color, description) => {
       const id = uid("board");
       const board: Board = { id, title, description: description || "Новая рабочая доска", color: color ?? palette[Object.keys(get().boards).length % palette.length], listIds: [], createdAt: new Date().toISOString() };

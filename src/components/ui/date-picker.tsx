@@ -10,16 +10,18 @@ import { cn } from "@/lib/utils";
 interface DatePickerProps {
   value?: string;
   onChange: (value?: string) => void;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 const weekDays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
-export function DatePicker({ value, onChange }: DatePickerProps) {
+export function DatePicker({ value, onChange, disabled = false, disabledReason }: DatePickerProps) {
   const selectedDate = value ? parseISO(value) : undefined;
   const today = new Date();
   const [open, setOpen] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(selectedDate ?? today));
-  const [position, setPosition] = useState({ top: 0, left: 0, width: 320 });
+  const [position, setPosition] = useState<{ top: number; left: number; width: number; maxHeight: number; visibility: "hidden" | "visible" }>({ top: 12, left: 12, width: 320, maxHeight: 400, visibility: "hidden" });
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -34,20 +36,44 @@ export function DatePicker({ value, onChange }: DatePickerProps) {
     if (!open || !triggerRef.current) return;
     const updatePosition = () => {
       const rect = triggerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const width = Math.min(320, window.innerWidth - 24);
-      const estimatedHeight = 356;
-      const below = window.innerHeight - rect.bottom;
-      const top = below >= estimatedHeight + 10 ? rect.bottom + 8 : Math.max(12, rect.top - estimatedHeight - 8);
-      const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
-      setPosition({ top, left, width });
+      const popover = popoverRef.current;
+      if (!rect || !popover) return;
+      const viewport = window.visualViewport;
+      const viewportLeft = viewport?.offsetLeft ?? 0;
+      const viewportTop = viewport?.offsetTop ?? 0;
+      const viewportWidth = viewport?.width ?? window.innerWidth;
+      const viewportHeight = viewport?.height ?? window.innerHeight;
+      const safe = 12;
+      const gap = 8;
+      const width = Math.min(320, Math.max(1, viewportWidth - safe * 2));
+      const measuredHeight = popover.scrollHeight;
+      const maxHeight = Math.max(1, viewportHeight - safe * 2);
+      const height = Math.min(measuredHeight, maxHeight);
+      const belowTop = rect.bottom + gap;
+      const aboveTop = rect.top - height - gap;
+      const viewportBottom = viewportTop + viewportHeight;
+      const top = belowTop + height <= viewportBottom - safe
+        ? belowTop
+        : aboveTop >= viewportTop + safe
+          ? aboveTop
+          : Math.max(viewportTop + safe, Math.min(belowTop, viewportBottom - height - safe));
+      const left = Math.max(viewportLeft + safe, Math.min(rect.left, viewportLeft + viewportWidth - width - safe));
+      setPosition({ top, left, width, maxHeight, visibility: "visible" });
     };
     updatePosition();
+    const observer = new ResizeObserver(updatePosition);
+    const observedPopover = popoverRef.current;
+    if (observedPopover) observer.observe(observedPopover);
     window.addEventListener("resize", updatePosition);
     window.addEventListener("scroll", updatePosition, true);
+    window.visualViewport?.addEventListener("resize", updatePosition);
+    window.visualViewport?.addEventListener("scroll", updatePosition);
     return () => {
+      observer.disconnect();
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
+      window.visualViewport?.removeEventListener("resize", updatePosition);
+      window.visualViewport?.removeEventListener("scroll", updatePosition);
     };
   }, [open]);
 
@@ -105,7 +131,7 @@ export function DatePicker({ value, onChange }: DatePickerProps) {
 
   return (
     <div className="date-picker" ref={rootRef}>
-      <button ref={triggerRef} type="button" className={cn("date-picker-trigger", open && "open", !value && "placeholder")} onClick={() => { setVisibleMonth(startOfMonth(selectedDate ?? today)); setOpen((current) => !current); }} aria-haspopup="dialog" aria-expanded={open}>
+      <button ref={triggerRef} type="button" className={cn("date-picker-trigger", open && "open", !value && "placeholder")} onClick={() => { setVisibleMonth(startOfMonth(selectedDate ?? today)); setPosition((current) => ({ ...current, visibility: "hidden" })); setOpen((current) => !current); }} aria-haspopup="dialog" aria-expanded={open} disabled={disabled} title={disabled ? disabledReason : undefined}>
         <CalendarDays size={16} />
         <span>{selectedDate ? format(selectedDate, "dd.MM.yyyy") : "Выберите дату"}</span>
         <ChevronDown size={15} />

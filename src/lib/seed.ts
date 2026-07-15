@@ -30,9 +30,9 @@ export const seedData: WorkspaceData = {
     "list-marketing-live": { id: "list-marketing-live", title: "Запущено", taskIds: [], collapsed: false, archived: false },
   },
   employees: {
-    "employee-anna": { id: "employee-anna", name: "Анна Смирнова", login: "admin", email: "anna@example.com", status: "active", role: "admin", createdAt: now.toISOString() },
-    "employee-mikhail": { id: "employee-mikhail", name: "Михаил Орлов", login: "mikhail@example.com", email: "mikhail@example.com", status: "active", role: "member", createdAt: now.toISOString() },
-    "employee-ekaterina": { id: "employee-ekaterina", name: "Екатерина Волкова", login: "ekaterina", status: "active", role: "member", createdAt: now.toISOString() },
+    "employee-anna": { id: "employee-anna", name: "Анна Смирнова", login: "admin", email: "anna@example.com", status: "active", role: "admin", canEditDeadlines: true, createdAt: now.toISOString() },
+    "employee-mikhail": { id: "employee-mikhail", name: "Михаил Орлов", login: "mikhail@example.com", email: "mikhail@example.com", status: "active", role: "member", canEditDeadlines: true, createdAt: now.toISOString() },
+    "employee-ekaterina": { id: "employee-ekaterina", name: "Екатерина Волкова", login: "ekaterina", status: "active", role: "member", canEditDeadlines: false, createdAt: now.toISOString() },
   },
   tasks: {
     "task-research": {

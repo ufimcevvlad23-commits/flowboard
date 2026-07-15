@@ -89,3 +89,26 @@ export function sanitizeWorkspacePayload(value: unknown): Omit<WorkspaceData, "e
 
   return { boards, lists, tasks, activeBoardId };
 }
+
+export function deadlinesChanged(
+  previous: Omit<WorkspaceData, "employees">,
+  next: Omit<WorkspaceData, "employees">,
+) {
+  for (const [taskId, nextTask] of Object.entries(next.tasks)) {
+    const previousTask = previous.tasks[taskId];
+    if (!previousTask) {
+      if (nextTask.dueDate || nextTask.checklist.some((item) => item.dueDate)) return true;
+      continue;
+    }
+    if (previousTask.dueDate !== nextTask.dueDate) return true;
+    const previousItems = new Map(previousTask.checklist.map((item) => [item.id, item.dueDate]));
+    for (const item of nextTask.checklist) {
+      if (!previousItems.has(item.id)) {
+        if (item.dueDate) return true;
+      } else if (previousItems.get(item.id) !== item.dueDate) {
+        return true;
+      }
+    }
+  }
+  return false;
+}

@@ -13,7 +13,8 @@ await sql`
     email TEXT,
     password_hash TEXT,
     password_salt TEXT,
-    role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'member')),
+    role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'member', 'guest')),
+    can_edit_deadlines BOOLEAN NOT NULL DEFAULT TRUE,
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'deleted')),
     failed_attempts INTEGER NOT NULL DEFAULT 0,
     locked_until TIMESTAMPTZ,
@@ -21,6 +22,11 @@ await sql`
     deleted_at TIMESTAMPTZ
   )
 `;
+await sql`ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_edit_deadlines BOOLEAN NOT NULL DEFAULT TRUE`;
+await sql`ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_role_check`;
+await sql`ALTER TABLE employees ADD CONSTRAINT employees_role_check CHECK (role IN ('admin', 'member', 'guest'))`;
+await sql`UPDATE employees SET can_edit_deadlines = TRUE WHERE role = 'admin'`;
+await sql`UPDATE employees SET can_edit_deadlines = FALSE WHERE role = 'guest'`;
 await sql`CREATE UNIQUE INDEX IF NOT EXISTS employees_login_unique ON employees (LOWER(login))`;
 await sql`CREATE UNIQUE INDEX IF NOT EXISTS employees_email_unique ON employees (LOWER(email)) WHERE email IS NOT NULL`;
 

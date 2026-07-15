@@ -56,7 +56,7 @@ export function Topbar({ currentUser, search, onSearch, filters, onFilters, filt
         </div>
         <button className="icon-button" onClick={onThemeToggle} aria-label={dark ? "Включить светлую тему" : "Включить тёмную тему"}>{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
         <button className="icon-button notification" onClick={onNotifications} aria-label="Уведомления"><Bell size={18} /></button>
-        <div className="avatar top-avatar" title={`${currentUser.name} · ${currentUser.role === "admin" ? "Администратор" : "Сотрудник"}`}>{employeeInitials(currentUser.name)}</div>
+        <div className="avatar top-avatar" title={`${currentUser.name} · ${currentUser.role === "admin" ? "Администратор" : currentUser.role === "guest" ? "Гость" : "Пользователь"}`}>{employeeInitials(currentUser.name)}</div>
         <button className="icon-button logout-button" onClick={() => void logout()} aria-label="Выйти из Flowboard" title="Выйти"><LogOut size={17} /></button>
       </div>
     </header>

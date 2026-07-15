@@ -1,7 +1,7 @@
 export type Priority = "low" | "medium" | "high" | "urgent";
 export type TaskStatus = "backlog" | "in-progress" | "review" | "done";
 export type EmployeeStatus = "active" | "deleted";
-export type EmployeeRole = "admin" | "member";
+export type EmployeeRole = "admin" | "member" | "guest";
 
 export interface Comment {
   id: string;
@@ -16,6 +16,7 @@ export interface Employee {
   email?: string;
   status: EmployeeStatus;
   role: EmployeeRole;
+  canEditDeadlines: boolean;
   createdAt: string;
   deletedAt?: string;
 }
@@ -85,6 +86,7 @@ export interface SessionUser {
   login: string;
   email?: string;
   role: EmployeeRole;
+  canEditDeadlines: boolean;
 }
 
 export interface WorkspaceSnapshot {
