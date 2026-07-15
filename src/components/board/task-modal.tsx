@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Archive, CalendarDays, CircleCheck, MessageSquare, Pin, RotateCcw, Save, Trash2, UserRoundCheck } from "lucide-react";
+import { Archive, CircleCheck, MessageSquare, Pin, RotateCcw, Save, Trash2, UserRoundCheck } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
+import { DatePicker } from "@/components/ui/date-picker";
 import { employeeColor, employeeInitials, priorityMeta, statusMeta } from "@/lib/utils";
 import { useBoardStore } from "@/store/use-board-store";
 import type { Priority, TaskDraft, TaskStatus } from "@/types/board";
@@ -46,7 +47,7 @@ export function TaskModal({ taskId, onClose }: TaskModalProps) {
           <div className="form-grid">
             <label className="field"><span>Приоритет</span><select value={draft.priority} onChange={(event) => setDraft({ ...draft, priority: event.target.value as Priority })}>{(Object.keys(priorityMeta) as Priority[]).map((value) => <option key={value} value={value}>{priorityMeta[value].label}</option>)}</select></label>
             <label className="field"><span>Статус</span><select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as TaskStatus })}>{(Object.keys(statusMeta) as TaskStatus[]).map((value) => <option key={value} value={value}>{statusMeta[value]}</option>)}</select></label>
-            <label className="field"><span>Дедлайн</span><div className="input-icon"><CalendarDays size={16} /><input type="date" value={draft.dueDate ?? ""} onChange={(event) => setDraft({ ...draft, dueDate: event.target.value || undefined })} /></div></label>
+            <div className="field"><span>Дедлайн</span><DatePicker value={draft.dueDate} onChange={(dueDate) => setDraft({ ...draft, dueDate })} /></div>
             <label className="field"><span>Метки через запятую</span><input value={labelsText} onChange={(event) => setLabelsText(event.target.value)} placeholder="UX, Важно" /></label>
           </div>
           <div className="field assignee-field">
