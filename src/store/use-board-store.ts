@@ -28,7 +28,7 @@ interface BoardState extends WorkspaceData {
   deleteTask: (taskId: string) => void;
   moveTask: (taskId: string, fromListId: string, toListId: string, overTaskId?: string) => void;
   reorderTask: (listId: string, activeId: string, overId: string) => void;
-  addComment: (taskId: string, text: string) => void;
+  addComment: (taskId: string, text: string, author?: string) => void;
   restoreTask: (taskId: string) => void;
   resetWorkspace: () => void;
 }
@@ -178,8 +178,8 @@ export const useBoardStore = create<BoardState>((set, get) => {
       const ids = state.lists[listId].taskIds;
       return { lists: { ...state.lists, [listId]: { ...state.lists[listId], taskIds: activeBeforeClosed(arrayMove(ids, ids.indexOf(activeId), ids.indexOf(overId)), state.tasks) } } };
     }),
-    addComment: (taskId, text) => {
-      const comment: Comment = { id: uid("comment"), author: "Вы", text, createdAt: new Date().toISOString() };
+    addComment: (taskId, text, author = "Вы") => {
+      const comment: Comment = { id: uid("comment"), author, text, createdAt: new Date().toISOString() };
       mutate((state) => ({ tasks: { ...state.tasks, [taskId]: { ...state.tasks[taskId], comments: [...state.tasks[taskId].comments, comment] } } }));
     },
     restoreTask: (taskId) => mutate((state) => ({ tasks: { ...state.tasks, [taskId]: { ...state.tasks[taskId], archived: false } } })),

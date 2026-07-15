@@ -7,18 +7,20 @@ import { ru } from "date-fns/locale";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import { DatePicker } from "@/components/ui/date-picker";
+import { SelectMenu } from "@/components/ui/select-menu";
 import { cn, employeeColor, employeeInitials, priorityMeta, statusMeta, uid } from "@/lib/utils";
 import { useBoardStore } from "@/store/use-board-store";
-import type { ChecklistItem, Priority, TaskDraft, TaskStatus } from "@/types/board";
+import type { ChecklistItem, Priority, SessionUser, TaskDraft, TaskStatus } from "@/types/board";
 
 interface TaskModalProps {
   taskId: string;
   onClose: () => void;
   canEdit: boolean;
   canEditDeadlines: boolean;
+  currentUser: SessionUser;
 }
 
-export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines }: TaskModalProps) {
+export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines, currentUser }: TaskModalProps) {
   const task = useBoardStore((state) => taskId ? state.tasks[taskId] : undefined);
   const updateTask = useBoardStore((state) => state.updateTask);
   const deleteTask = useBoardStore((state) => state.deleteTask);
@@ -27,9 +29,11 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines }: TaskMo
   const employees = useBoardStore((state) => state.employees);
   const [draft, setDraft] = useState<TaskDraft>(() => task ? ({ title: task.title, checklist: task.checklist ?? [], priority: task.priority, status: task.status, dueDate: task.dueDate, labels: task.labels, assigneeIds: task.assigneeIds ?? [], notes: task.notes }) : ({ title: "", checklist: [], priority: "medium", status: "backlog", labels: [], assigneeIds: [], notes: "" }));
   const [comment, setComment] = useState("");
-  const [labelsText, setLabelsText] = useState(task?.labels.join(", ") ?? "");
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionStart, setMentionStart] = useState<number | null>(null);
   const [newItemTitle, setNewItemTitle] = useState("");
   const autoSaveReady = useRef(false);
+  const commentRef = useRef<HTMLTextAreaElement>(null);
   const taskExists = Boolean(task);
 
   useEffect(() => {
@@ -39,13 +43,13 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines }: TaskMo
       return;
     }
     if (!draft.title.trim() || draft.checklist.some((item) => !item.title.trim())) return;
-    const labels = labelsText.split(",").map((item) => item.trim()).filter(Boolean);
     const activeAssigneeIds = draft.assigneeIds.filter((id) => employees[id]?.status === "active");
-    updateTask(taskId, { ...draft, title: draft.title.trim(), checklist: draft.checklist.map((item) => ({ ...item, title: item.title.trim() })), labels, assigneeIds: activeAssigneeIds });
-  }, [canEdit, draft, employees, labelsText, taskExists, taskId, updateTask]);
+    updateTask(taskId, { ...draft, title: draft.title.trim(), checklist: draft.checklist.map((item) => ({ ...item, title: item.title.trim() })), assigneeIds: activeAssigneeIds });
+  }, [canEdit, draft, employees, taskExists, taskId, updateTask]);
 
   if (!task) return null;
   const employeeList = Object.values(employees).filter((employee) => employee.status === "active").sort((a, b) => a.name.localeCompare(b.name, "ru"));
+  const mentionEmployees = employeeList.filter((employee) => mentionQuery !== null && employee.name.toLocaleLowerCase("ru").includes(mentionQuery.toLocaleLowerCase("ru"))).slice(0, 6);
   const deletedAssignees = draft.assigneeIds.map((id) => employees[id]).filter((employee) => employee?.status === "deleted");
   const completedItems = draft.checklist.filter((item) => item.completed).length;
   const progress = draft.checklist.length ? Math.round((completedItems / draft.checklist.length) * 100) : 0;
@@ -56,6 +60,23 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines }: TaskMo
     if (!title) return;
     setDraft({ ...draft, checklist: [...draft.checklist, { id: uid("check"), title, completed: false, createdAt: new Date().toISOString() }] });
     setNewItemTitle("");
+  };
+  const updateComment = (value: string, caret: number) => {
+    setComment(value);
+    const beforeCaret = value.slice(0, caret);
+    const match = beforeCaret.match(/(?:^|\s)@([\p{L}\d._-]*)$/u);
+    if (!match) { setMentionQuery(null); setMentionStart(null); return; }
+    setMentionQuery(match[1]);
+    setMentionStart(beforeCaret.lastIndexOf("@"));
+  };
+  const insertMention = (name: string) => {
+    if (mentionStart === null) return;
+    const caret = commentRef.current?.selectionStart ?? comment.length;
+    const next = `${comment.slice(0, mentionStart)}@${name} ${comment.slice(caret)}`;
+    setComment(next);
+    setMentionQuery(null);
+    setMentionStart(null);
+    requestAnimationFrame(() => { commentRef.current?.focus(); commentRef.current?.setSelectionRange(mentionStart + name.length + 2, mentionStart + name.length + 2); });
   };
 
   return (
@@ -89,10 +110,9 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines }: TaskMo
             {canEdit && <div className="checklist-add"><input value={newItemTitle} onChange={(event) => setNewItemTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addChecklistItem(); } }} placeholder="Новый пункт чек-листа" aria-label="Новый пункт чек-листа" /><button type="button" className="button secondary compact" onClick={addChecklistItem} disabled={!newItemTitle.trim()}><Plus size={14} />Добавить</button></div>}
           </section>
           <div className="form-grid">
-            <label className="field"><span>Приоритет</span><select value={draft.priority} disabled={!canEdit} onChange={(event) => setDraft({ ...draft, priority: event.target.value as Priority })}>{(Object.keys(priorityMeta) as Priority[]).map((value) => <option key={value} value={value}>{priorityMeta[value].label}</option>)}</select></label>
-            <label className="field"><span>Статус</span><select value={draft.status} disabled={!canEdit} onChange={(event) => setDraft({ ...draft, status: event.target.value as TaskStatus })}>{(Object.keys(statusMeta) as TaskStatus[]).map((value) => <option key={value} value={value}>{statusMeta[value]}</option>)}</select></label>
+            <div className="field"><span>Приоритет</span><SelectMenu value={draft.priority} disabled={!canEdit} ariaLabel="Приоритет" options={(Object.keys(priorityMeta) as Priority[]).map((value) => ({ value, label: priorityMeta[value].label }))} onChange={(value) => setDraft({ ...draft, priority: value as Priority })} /></div>
+            <div className="field"><span>Статус</span><SelectMenu value={draft.status} disabled={!canEdit} ariaLabel="Статус" options={(Object.keys(statusMeta) as TaskStatus[]).map((value) => ({ value, label: statusMeta[value] }))} onChange={(value) => setDraft({ ...draft, status: value as TaskStatus })} /></div>
             <div className="field"><span>Дедлайн задачи</span><DatePicker value={draft.dueDate} onChange={(dueDate) => setDraft({ ...draft, dueDate })} disabled={!canEdit || !canEditDeadlines} disabledReason={!canEdit ? "Гостю доступен только просмотр" : "Администратор запретил изменение дедлайнов"} /></div>
-            <label className="field"><span>Метки через запятую</span><input value={labelsText} readOnly={!canEdit} onChange={(event) => setLabelsText(event.target.value)} placeholder="UX, Важно" /></label>
           </div>
           <div className="field assignee-field">
             <span><UserRoundCheck size={13} />Ответственные</span>
@@ -109,7 +129,7 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines }: TaskMo
             {task.comments.map((item) => <div className="comment" key={item.id}><div className="avatar small-avatar">{item.author.slice(0, 1)}</div><div><header><strong>{item.author}</strong><time>{formatDistanceToNow(new Date(item.createdAt), { addSuffix: true, locale: ru })}</time></header><p>{item.text}</p></div></div>)}
             {task.comments.length === 0 && <div className="empty-comments">Начните обсуждение задачи</div>}
           </div>
-          {canEdit && <div className="comment-form"><textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Написать комментарий..." /><button className="button secondary compact" onClick={() => { if (!comment.trim()) return; addComment(task.id, comment.trim()); setComment(""); }}>Отправить</button></div>}
+          {canEdit && <div className="comment-form"><textarea ref={commentRef} value={comment} onChange={(event) => updateComment(event.target.value, event.target.selectionStart)} placeholder="Написать комментарий... Используйте @ для упоминания" />{mentionQuery !== null && <div className="mention-popover"><div className="mention-title">Упомянуть сотрудника</div>{mentionEmployees.map((employee) => <button type="button" key={employee.id} onClick={() => insertMention(employee.name)}><span className="employee-avatar" style={{ background: employeeColor(employee.id) }}>{employeeInitials(employee.name)}</span><span><strong>{employee.name}</strong><small>{employee.email || employee.login}</small></span></button>)}{mentionEmployees.length === 0 && <span className="mention-empty">Сотрудники не найдены</span>}</div>}<button className="button secondary compact" onClick={() => { if (!comment.trim()) return; addComment(task.id, comment.trim(), currentUser.name); setComment(""); setMentionQuery(null); }}>Отправить</button></div>}
         </aside>
       </div>
       <footer className="modal-actions task-actions">

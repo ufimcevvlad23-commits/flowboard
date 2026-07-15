@@ -1,8 +1,19 @@
 "use client";
 
-import { Bell, Filter, LogOut, Menu, Moon, Search, SlidersHorizontal, Sun, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AlertTriangle, AtSign, Bell, CalendarClock, Filter, LogOut, Menu, Moon, Search, SlidersHorizontal, Sun, X } from "lucide-react";
+import { SelectMenu } from "@/components/ui/select-menu";
 import type { Filters, Priority, SessionUser, TaskStatus } from "@/types/board";
 import { employeeInitials, priorityMeta, statusMeta } from "@/lib/utils";
+
+export interface TaskNotification {
+  id: string;
+  kind: "overdue" | "soon" | "mention";
+  title: string;
+  detail: string;
+  taskId: string;
+  boardId: string;
+}
 
 interface TopbarProps {
   currentUser: SessionUser;
@@ -16,15 +27,26 @@ interface TopbarProps {
   onThemeToggle: () => void;
   onMobileMenu: () => void;
   labels: string[];
-  onNotifications: () => void;
+  notifications: TaskNotification[];
+  onOpenNotification: (notification: TaskNotification) => void;
 }
-export function Topbar({ currentUser, search, onSearch, filters, onFilters, filterOpen, onFilterOpen, dark, onThemeToggle, onMobileMenu, labels, onNotifications }: TopbarProps) {
+export function Topbar({ currentUser, search, onSearch, filters, onFilters, filterOpen, onFilterOpen, dark, onThemeToggle, onMobileMenu, labels, notifications, onOpenNotification }: TopbarProps) {
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const notificationRef = useRef<HTMLDivElement>(null);
   const activeCount = filters.priorities.length + filters.statuses.length + (filters.label ? 1 : 0) + (filters.due !== "all" ? 1 : 0);
   const toggle = <T extends string>(items: T[], value: T) => items.includes(value) ? items.filter((item) => item !== value) : [...items, value];
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.assign("/login");
   };
+  useEffect(() => {
+    if (!notificationOpen) return;
+    const closeOutside = (event: PointerEvent) => { if (!notificationRef.current?.contains(event.target as Node)) setNotificationOpen(false); };
+    const closeEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setNotificationOpen(false); };
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeEscape);
+    return () => { document.removeEventListener("pointerdown", closeOutside); document.removeEventListener("keydown", closeEscape); };
+  }, [notificationOpen]);
 
   return (
     <header className="topbar">
@@ -49,13 +71,16 @@ export function Topbar({ currentUser, search, onSearch, filters, onFilters, filt
               <div className="filter-group"><label>Статус</label><div className="chip-grid">
                 {(Object.keys(statusMeta) as TaskStatus[]).map((value) => <button key={value} className={filters.statuses.includes(value) ? "active" : ""} onClick={() => onFilters({ ...filters, statuses: toggle(filters.statuses, value) })}>{statusMeta[value]}</button>)}
               </div></div>
-              <div className="filter-group"><label htmlFor="label-filter">Метка</label><select id="label-filter" value={filters.label} onChange={(event) => onFilters({ ...filters, label: event.target.value })}><option value="">Любая</option>{labels.map((label) => <option value={label} key={label}>{label}</option>)}</select></div>
-              <div className="filter-group"><label htmlFor="due-filter">Срок</label><select id="due-filter" value={filters.due} onChange={(event) => onFilters({ ...filters, due: event.target.value as Filters["due"] })}><option value="all">Любой</option><option value="overdue">Просрочено</option><option value="today">Сегодня</option><option value="week">На этой неделе</option></select></div>
+              <div className="filter-group"><label>Метка</label><SelectMenu compact value={filters.label} ariaLabel="Фильтр по метке" options={[{ value: "", label: "Любая" }, ...labels.map((label) => ({ value: label, label }))]} onChange={(value) => onFilters({ ...filters, label: value })} /></div>
+              <div className="filter-group"><label>Срок</label><SelectMenu compact value={filters.due} ariaLabel="Фильтр по сроку" options={[{ value: "all", label: "Любой" }, { value: "overdue", label: "Просрочено" }, { value: "today", label: "Сегодня" }, { value: "week", label: "На этой неделе" }]} onChange={(value) => onFilters({ ...filters, due: value as Filters["due"] })} /></div>
             </div>
           )}
         </div>
         <button className="icon-button" onClick={onThemeToggle} aria-label={dark ? "Включить светлую тему" : "Включить тёмную тему"}>{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
-        <button className="icon-button notification" onClick={onNotifications} aria-label="Уведомления"><Bell size={18} /></button>
+        <div className="notification-wrap" ref={notificationRef}>
+          <button className="icon-button notification" onClick={() => setNotificationOpen((current) => !current)} aria-label="Уведомления" aria-expanded={notificationOpen}><Bell size={18} />{notifications.length > 0 && <b>{Math.min(notifications.length, 99)}</b>}</button>
+          {notificationOpen && <div className="notification-popover"><div className="notification-heading"><span><Bell size={15} />Уведомления</span><b>{notifications.length}</b></div><div className="notification-list">{notifications.map((notification) => <button type="button" className={`notification-item ${notification.kind}`} key={notification.id} onClick={() => { setNotificationOpen(false); onOpenNotification(notification); }}>{notification.kind === "mention" ? <AtSign size={16} /> : notification.kind === "overdue" ? <AlertTriangle size={16} /> : <CalendarClock size={16} />}<span><strong>{notification.title}</strong><small>{notification.detail}</small></span></button>)}{notifications.length === 0 && <div className="notification-empty"><Bell size={22} /><strong>Всё спокойно</strong><span>Новых уведомлений нет</span></div>}</div></div>}
+        </div>
         <div className="avatar top-avatar" title={`${currentUser.name} · ${currentUser.role === "admin" ? "Администратор" : currentUser.role === "guest" ? "Гость" : "Пользователь"}`}>{employeeInitials(currentUser.name)}</div>
         <button className="icon-button logout-button" onClick={() => void logout()} aria-label="Выйти из Flowboard" title="Выйти"><LogOut size={17} /></button>
       </div>
