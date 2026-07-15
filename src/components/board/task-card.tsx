@@ -3,7 +3,7 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Archive, CalendarDays, CheckSquare2, CircleCheck, MessageSquare, Paperclip, Pin, PinOff, RotateCcw, UsersRound } from "lucide-react";
+import { AlertTriangle, Archive, CalendarDays, CheckSquare2, CircleCheck, MessageSquare, Paperclip, Pin, PinOff, RotateCcw, UsersRound } from "lucide-react";
 import { format, isBefore, isToday, startOfToday } from "date-fns";
 import { ru } from "date-fns/locale";
 import { cn, priorityMeta } from "@/lib/utils";
@@ -25,6 +25,9 @@ export function TaskCard({ task, listId, onOpen, overlay = false }: TaskCardProp
   const style = { transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition };
   const overdue = task.dueDate && isBefore(new Date(`${task.dueDate}T23:59:59`), startOfToday()) && task.status !== "done" && !task.closed;
   const assignees = (task.assigneeIds ?? []).map((id) => employees[id]).filter(Boolean);
+  const checklist = task.checklist ?? [];
+  const checklistDone = checklist.filter((item) => item.completed).length;
+  const checklistOverdue = checklist.filter((item) => item.dueDate && !item.completed && isBefore(new Date(`${item.dueDate}T23:59:59`), startOfToday())).length;
 
   return (
     <article
@@ -48,7 +51,7 @@ export function TaskCard({ task, listId, onOpen, overlay = false }: TaskCardProp
       {task.labels.length > 0 && <div className="label-row">{task.labels.slice(0, 3).map((label, index) => <span key={label} className={`label-color-${index % 4}`}>{label}</span>)}</div>}
       {task.closed && <span className="closed-badge"><CircleCheck size={12} />Закрыта</span>}
       <h3>{task.title}</h3>
-      {task.description && <p>{task.description}</p>}
+      {checklist.length > 0 && <div className={cn("card-checklist-line", checklistDone === checklist.length && "complete", checklistOverdue > 0 && "has-overdue")}><CheckSquare2 size={13} /><span>{checklistDone} из {checklist.length}</span><i><b style={{ width: `${Math.round((checklistDone / checklist.length) * 100)}%` }} /></i>{checklistOverdue > 0 && <em title={`Просрочено пунктов: ${checklistOverdue}`}><AlertTriangle size={12} />{checklistOverdue}</em>}</div>}
       {assignees.length > 0 && <div className="card-assignee-line" title={assignees.map((employee) => employee.name).join(", ")}><UsersRound size={13} /><span>{assignees.slice(0, 2).map((employee) => employee.name).join(", ")}{assignees.length > 2 && ` +${assignees.length - 2}`}</span></div>}
       <div className="task-card-footer">
         <div className="card-meta">
@@ -56,7 +59,7 @@ export function TaskCard({ task, listId, onOpen, overlay = false }: TaskCardProp
           {task.comments.length > 0 && <span><MessageSquare size={13} />{task.comments.length}</span>}
           {task.notes && <span><Paperclip size={13} />1</span>}
         </div>
-        <span className={cn("task-check", (task.status === "done" || task.closed) && "done")}><CheckSquare2 size={15} /></span>
+        <span className={cn("task-check", (task.status === "done" || task.closed || (checklist.length > 0 && checklistDone === checklist.length)) && "done")}><CheckSquare2 size={15} /></span>
       </div>
     </article>
   );

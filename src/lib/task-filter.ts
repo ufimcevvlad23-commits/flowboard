@@ -6,7 +6,7 @@ export function taskMatches(task: Task, search: string, filters: Filters, listTi
   if (task.archived) return false;
 
   const normalizedSearch = search.trim().toLocaleLowerCase("ru");
-  const haystack = `${task.title} ${task.description} ${task.labels.join(" ")} ${listTitle}`.toLocaleLowerCase("ru");
+  const haystack = `${task.title} ${(task.checklist ?? []).map((item) => item.title).join(" ")} ${task.labels.join(" ")} ${listTitle}`.toLocaleLowerCase("ru");
   if (normalizedSearch && !haystack.includes(normalizedSearch)) return false;
   if (filters.priorities.length && !filters.priorities.includes(task.priority)) return false;
   if (filters.statuses.length && !filters.statuses.includes(task.status)) return false;

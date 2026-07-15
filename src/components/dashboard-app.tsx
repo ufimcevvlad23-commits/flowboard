@@ -14,11 +14,11 @@ import { Topbar } from "@/components/layout/topbar";
 import { useBoardStore } from "@/store/use-board-store";
 import { pluralize } from "@/lib/utils";
 import type { TaskSort } from "@/lib/task-filter";
-import type { Filters } from "@/types/board";
+import type { Filters, WorkspaceSnapshot } from "@/types/board";
 
 const defaultFilters: Filters = { priorities: [], statuses: [], label: "", due: "all" };
 
-export function DashboardApp() {
+export function DashboardApp({ initialSnapshot }: { initialSnapshot: WorkspaceSnapshot }) {
   const mounted = useSyncExternalStore(() => () => undefined, () => true, () => false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -39,6 +39,25 @@ export function DashboardApp() {
   const lists = useBoardStore((state) => state.lists);
   const tasks = useBoardStore((state) => state.tasks);
   const employees = useBoardStore((state) => state.employees);
+  const hydrated = useBoardStore((state) => state.hydrated);
+  const saving = useBoardStore((state) => state.saving);
+  const saveError = useBoardStore((state) => state.saveError);
+  const hydrateWorkspace = useBoardStore((state) => state.hydrateWorkspace);
+
+  useEffect(() => {
+    hydrateWorkspace(initialSnapshot);
+  }, [hydrateWorkspace, initialSnapshot]);
+
+  useEffect(() => {
+    const verify = async () => {
+      const response = await fetch("/api/auth/session", { cache: "no-store" });
+      if (response.status === 401) window.location.assign("/login");
+    };
+    const interval = window.setInterval(() => void verify(), 10_000);
+    const onVisibility = () => document.visibilityState === "visible" && void verify();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => { window.clearInterval(interval); document.removeEventListener("visibilitychange", onVisibility); };
+  }, []);
 
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
@@ -66,7 +85,7 @@ export function DashboardApp() {
 
   const exportWorkspace = () => {
     const { boards, lists: allLists, tasks: allTasks, employees: allEmployees, activeBoardId: currentBoardId } = useBoardStore.getState();
-    const payload = JSON.stringify({ version: 2, exportedAt: new Date().toISOString(), activeBoardId: currentBoardId, boards, lists: allLists, tasks: allTasks, employees: allEmployees }, null, 2);
+    const payload = JSON.stringify({ version: 3, exportedAt: new Date().toISOString(), activeBoardId: currentBoardId, boards, lists: allLists, tasks: allTasks, employees: allEmployees }, null, 2);
     const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
     const link = document.createElement("a");
     link.href = url;
@@ -76,7 +95,7 @@ export function DashboardApp() {
     toast.success("Резервная копия скачана");
   };
 
-  if (!mounted) return <div className="app-loading"><div className="loading-logo">F</div><div className="loading-line" /><span>Загружаем рабочее пространство…</span></div>;
+  if (!mounted || !hydrated) return <div className="app-loading"><div className="loading-logo">F</div><div className="loading-line" /><span>Загружаем защищённое рабочее пространство…</span></div>;
 
   if (!board) return (
     <main className="empty-workspace"><div className="brand-mark large">F</div><h1>Создайте первую доску</h1><p>Организуйте проект в списках и двигайте задачи к результату.</p><button className="button primary" onClick={() => { setManagedBoardId(null); setBoardDialogOpen(true); }}><Plus size={16} />Создать доску</button><BoardDialog key={`new-${boardDialogOpen}`} open={boardDialogOpen} boardId={null} onClose={() => setBoardDialogOpen(false)} /></main>
@@ -84,10 +103,10 @@ export function DashboardApp() {
 
   return (
     <div className={`app-shell ${sidebarCollapsed ? "sidebar-is-collapsed" : ""} ${compact ? "compact-mode" : ""} ${mobileOpen ? "mobile-sidebar-open" : ""}`}>
-      <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateBoard={() => { setManagedBoardId(null); setBoardDialogOpen(true); }} onManageBoard={(id) => { setManagedBoardId(id); setBoardDialogOpen(true); }} onOpenArchive={() => setArchiveOpen(true)} />
+      <Sidebar currentUser={initialSnapshot.currentUser} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateBoard={() => { setManagedBoardId(null); setBoardDialogOpen(true); }} onManageBoard={(id) => { setManagedBoardId(id); setBoardDialogOpen(true); }} onOpenArchive={() => setArchiveOpen(true)} />
       {mobileOpen && <button className="mobile-overlay" onClick={() => setMobileOpen(false)} aria-label="Закрыть меню" />}
       <div className="workspace">
-        <Topbar search={search} onSearch={setSearch} filters={filters} onFilters={setFilters} filterOpen={filterOpen} onFilterOpen={setFilterOpen} dark={dark} onThemeToggle={() => setDark(!dark)} onMobileMenu={() => setMobileOpen(true)} labels={availableLabels} onNotifications={() => toast.info("Новых уведомлений нет")} />
+        <Topbar currentUser={initialSnapshot.currentUser} search={search} onSearch={setSearch} filters={filters} onFilters={setFilters} filterOpen={filterOpen} onFilterOpen={setFilterOpen} dark={dark} onThemeToggle={() => setDark(!dark)} onMobileMenu={() => setMobileOpen(true)} labels={availableLabels} onNotifications={() => toast.info("Новых уведомлений нет")} />
         <main className="board-view">
           <section className="board-header">
             <div className="board-title-block">
@@ -97,8 +116,8 @@ export function DashboardApp() {
             <div className="board-summary">
               <div className="stat"><BarChart3 size={16} /><span><b>{stats.total}</b> {pluralize(stats.total, ["задача", "задачи", "задач"])}</span></div>
               <div className="stat success"><CheckCircle2 size={16} /><span><b>{stats.done}</b> {pluralize(stats.done, ["готова", "готовы", "готово"])}</span></div>
-              <div className="stat saved"><HardDrive size={16} /><span>Сохранено</span></div>
-              <button className="button secondary team-button" onClick={() => setTeamOpen(true)} aria-label={`Сотрудники: ${Object.keys(employees).length}`}><UsersRound size={15} /><span>{Object.keys(employees).length} {pluralize(Object.keys(employees).length, ["сотрудник", "сотрудника", "сотрудников"])}</span></button>
+              <div className={`stat saved ${saveError ? "save-failed" : ""}`} title={saveError ?? undefined}><HardDrive size={16} /><span>{saveError ? "Ошибка сохранения" : saving ? "Сохраняем…" : "Сохранено"}</span></div>
+              <button className="button secondary team-button" onClick={() => setTeamOpen(true)} aria-label={`Активные сотрудники: ${Object.values(employees).filter((employee) => employee.status === "active").length}`}><UsersRound size={15} /><span>{Object.values(employees).filter((employee) => employee.status === "active").length} {pluralize(Object.values(employees).filter((employee) => employee.status === "active").length, ["сотрудник", "сотрудника", "сотрудников"])}</span></button>
               <button className="button secondary invite-button" onClick={exportWorkspace}><Download size={15} />Экспорт</button>
             </div>
           </section>
@@ -114,7 +133,7 @@ export function DashboardApp() {
       </div>
       {activeTaskId && <TaskModal key={activeTaskId} taskId={activeTaskId} onClose={() => setActiveTaskId(null)} />}
       <BoardDialog key={`${managedBoardId ?? "new"}-${boardDialogOpen}`} open={boardDialogOpen} boardId={managedBoardId} onClose={() => setBoardDialogOpen(false)} />
-      <TeamDialog open={teamOpen} onClose={() => setTeamOpen(false)} />
+      <TeamDialog open={teamOpen} onClose={() => setTeamOpen(false)} canManage={initialSnapshot.currentUser.role === "admin"} currentUserId={initialSnapshot.currentUser.id} />
       <ArchiveDialog open={archiveOpen} onClose={() => setArchiveOpen(false)} />
       <Toaster theme={dark ? "dark" : "light"} position="bottom-right" richColors closeButton />
     </div>

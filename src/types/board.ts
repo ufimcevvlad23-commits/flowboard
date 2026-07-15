@@ -1,5 +1,7 @@
 export type Priority = "low" | "medium" | "high" | "urgent";
 export type TaskStatus = "backlog" | "in-progress" | "review" | "done";
+export type EmployeeStatus = "active" | "deleted";
+export type EmployeeRole = "admin" | "member";
 
 export interface Comment {
   id: string;
@@ -10,13 +12,24 @@ export interface Comment {
 export interface Employee {
   id: string;
   name: string;
+  login: string;
   email?: string;
+  status: EmployeeStatus;
+  role: EmployeeRole;
+  createdAt: string;
+  deletedAt?: string;
+}
+export interface ChecklistItem {
+  id: string;
+  title: string;
+  completed: boolean;
+  dueDate?: string;
   createdAt: string;
 }
 export interface Task {
   id: string;
   title: string;
-  description: string;
+  checklist: ChecklistItem[];
   priority: Priority;
   status: TaskStatus;
   dueDate?: string;
@@ -57,13 +70,27 @@ export interface WorkspaceData {
 
 export interface TaskDraft {
   title: string;
-  description: string;
+  checklist: ChecklistItem[];
   priority: Priority;
   status: TaskStatus;
   dueDate?: string;
   labels: string[];
   assigneeIds: string[];
   notes: string;
+}
+
+export interface SessionUser {
+  id: string;
+  name: string;
+  login: string;
+  email?: string;
+  role: EmployeeRole;
+}
+
+export interface WorkspaceSnapshot {
+  workspace: WorkspaceData;
+  version: number;
+  currentUser: SessionUser;
 }
 
 export interface Filters {

@@ -48,8 +48,10 @@ export function TaskTable({ boardId, search, filters, sort, onOpenTask }: TaskTa
         <tbody>
           {visibleTasks.map((task: Task) => {
             const assignees = (task.assigneeIds ?? []).map((id) => employees[id]).filter(Boolean);
+            const checklist = task.checklist ?? [];
+            const checklistDone = checklist.filter((item) => item.completed).length;
             return <tr className={task.closed ? "closed" : ""} key={task.id} onClick={() => onOpenTask(task.id)} tabIndex={0} onKeyDown={(event) => event.key === "Enter" && onOpenTask(task.id)}>
-              <td><div className="table-task-title"><span className="table-priority-dot" style={{ background: priorityMeta[task.priority].color }} />{task.status === "done" || task.closed ? <CheckCircle2 size={15} /> : <ListChecks size={15} />}<strong>{task.title}</strong>{task.closed && <span className="table-closed-chip">Закрыта</span>}</div>{task.description && <small>{task.description}</small>}</td>
+              <td><div className="table-task-title"><span className="table-priority-dot" style={{ background: priorityMeta[task.priority].color }} />{task.status === "done" || task.closed ? <CheckCircle2 size={15} /> : <ListChecks size={15} />}<strong>{task.title}</strong>{task.closed && <span className="table-closed-chip">Закрыта</span>}</div>{checklist.length > 0 && <small className="table-checklist"><ListChecks size={12} />Чек-лист: {checklistDone}/{checklist.length}</small>}</td>
               <td><span className="table-list-chip">{listByTask.get(task.id)}</span></td>
               <td>{assignees.length > 0 ? <span className="table-assignees" title={assignees.map((employee) => employee.name).join(", ")}><UsersRound size={13} />{assignees.map((employee) => employee.name).join(", ")}</span> : <span className="table-muted">Не назначены</span>}</td>
               <td><span className={`status-chip status-${task.status}`}>{statusMeta[task.status]}</span></td>

@@ -1,17 +1,19 @@
 "use client";
 
 import { Archive, ChevronLeft, ChevronRight, LayoutDashboard, Plus, Settings2, Sparkles } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, employeeInitials } from "@/lib/utils";
 import { useBoardStore } from "@/store/use-board-store";
+import type { SessionUser } from "@/types/board";
 
 interface SidebarProps {
+  currentUser: SessionUser;
   collapsed: boolean;
   onToggle: () => void;
   onCreateBoard: () => void;
   onManageBoard: (id: string) => void;
   onOpenArchive: () => void;
 }
-export function Sidebar({ collapsed, onToggle, onCreateBoard, onManageBoard, onOpenArchive }: SidebarProps) {
+export function Sidebar({ currentUser, collapsed, onToggle, onCreateBoard, onManageBoard, onOpenArchive }: SidebarProps) {
   const boards = useBoardStore((state) => state.boards);
   const activeBoardId = useBoardStore((state) => state.activeBoardId);
   const setActiveBoard = useBoardStore((state) => state.setActiveBoard);
@@ -49,8 +51,8 @@ export function Sidebar({ collapsed, onToggle, onCreateBoard, onManageBoard, onO
 
       {!collapsed && (
         <div className="sidebar-footer">
-          <div className="avatar">УФ</div>
-          <div><strong>Ваше пространство</strong><span>Локальная версия</span></div>
+          <div className="avatar">{employeeInitials(currentUser.name)}</div>
+          <div><strong>{currentUser.name}</strong><span>{currentUser.role === "admin" ? "Администратор" : "Сотрудник"}</span></div>
         </div>
       )}
     </aside>
