@@ -48,3 +48,10 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# FastAPI MVP local data
+*.db
+*.sqlite
+*.sqlite3
+__pycache__/
+.pytest_cache/

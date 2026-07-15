@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SEO Article Factory</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; background:#0c1220; color:#e8edf7 }
+    * { box-sizing:border-box } body { margin:0; background:radial-gradient(circle at top left,#1b3155 0,#0c1220 42%); min-height:100vh }
+    main { width:min(1120px,calc(100% - 32px)); margin:auto; padding:48px 0 72px }
+    header { display:flex; justify-content:space-between; gap:24px; align-items:end; margin-bottom:28px }
+    h1 { margin:0; font-size:clamp(28px,5vw,52px); letter-spacing:-.04em } header p { margin:8px 0 0; color:#9eabc0 }
+    a { color:#8fc5ff } .grid { display:grid; grid-template-columns:minmax(300px,420px) 1fr; gap:20px }
+    .card { background:rgba(17,26,44,.92); border:1px solid #2a3852; border-radius:18px; padding:22px; box-shadow:0 18px 60px #05081266 }
+    label { display:block; color:#b9c5d7; font-size:13px; margin:14px 0 6px }
+    input,textarea,select,button { width:100%; border-radius:10px; border:1px solid #34445f; padding:11px 12px; font:inherit }
+    input,textarea,select { background:#0d1627; color:#fff } textarea { min-height:96px; resize:vertical }
+    button { background:#4f96ff; color:#07101f; border:0; font-weight:750; cursor:pointer; margin-top:12px }
+    button.secondary { background:#22324c; color:#e8edf7 } button:disabled { opacity:.5; cursor:wait }
+    .actions { display:grid; grid-template-columns:1fr 1fr; gap:10px }
+    .status { min-height:24px; color:#9fb2cd; margin:14px 0 0 }
+    pre { white-space:pre-wrap; overflow-wrap:anywhere; background:#0a111e; border-radius:12px; padding:16px; min-height:280px; max-height:720px; overflow:auto; color:#d8e4f5 }
+    .exports { display:flex; gap:12px; flex-wrap:wrap; min-height:24px } .exports a { display:none }
+    @media (max-width:820px) { .grid { grid-template-columns:1fr } header { align-items:start; flex-direction:column } }
+  </style>
+</head>
+<body>
+<main>
+  <header><div><h1>SEO Article Factory</h1><p>Ключи → структура → статья → оценка → экспорт</p></div><a href="/docs">API / Swagger</a></header>
+  <div class="grid">
+    <form id="project-form" class="card">
+      <h2>Новый проект</h2>
+      <label for="topic">Тема статьи *</label><input id="topic" name="topic" required placeholder="Например, автоматизация SEO">
+      <label for="url">URL конкурента</label><input id="url" name="competitor_url" type="url" placeholder="https://example.com/article">
+      <label for="keyword_text">Ключевые слова</label><textarea id="keyword_text" name="keyword_text" placeholder="Один ключ на строку"></textarea>
+      <label for="keyword_file">Или файл CSV / XLSX / TXT</label><input id="keyword_file" name="keyword_file" type="file" accept=".csv,.xlsx,.txt">
+      <label for="outline">Структура из ТЗ (необязательно)</label><textarea id="outline" name="source_outline" placeholder="# H1&#10;## Раздел"></textarea>
+      <label for="audience">Целевая аудитория</label><input id="audience" name="target_audience" value="широкая аудитория">
+      <label for="style">Стиль</label><input id="style" name="writing_style" value="экспертный инфостиль">
+      <label for="length">Длина, слов</label><input id="length" name="desired_length" type="number" min="300" max="10000" value="1500">
+      <button id="create" type="submit">Создать и проанализировать</button>
+      <div class="actions"><button id="generate" type="button" class="secondary" disabled>Сгенерировать статью</button><button id="refresh" type="button" class="secondary" disabled>Обновить данные</button></div>
+      <p id="status" class="status" role="status"></p>
+      <div id="exports" class="exports"><a data-format="json">JSON</a><a data-format="csv">CSV</a><a data-format="xlsx">XLSX</a></div>
+    </form>
+    <section class="card"><h2>Результат</h2><pre id="result">Создайте проект, чтобы увидеть outline, статью и SEO-оценку.</pre></section>
+  </div>
+</main>
+<script>
+  let projectId = null;
+  const form = document.querySelector('#project-form');
+  const statusEl = document.querySelector('#status');
+  const result = document.querySelector('#result');
+  const generate = document.querySelector('#generate');
+  const refresh = document.querySelector('#refresh');
+  const show = data => { result.textContent = JSON.stringify(data, null, 2); };
+  const message = text => { statusEl.textContent = text; };
+  async function api(url, options={}) {
+    const response = await fetch(url, options); const data = await response.json();
+    if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail));
+    return data;
+  }
+  function enableProjectActions() {
+    generate.disabled = refresh.disabled = false;
+    document.querySelectorAll('#exports a').forEach(link => { link.style.display='inline'; link.href=`/projects/${projectId}/export?format=${link.dataset.format}`; });
+  }
+  form.addEventListener('submit', async event => {
+    event.preventDefault(); const button=document.querySelector('#create'); button.disabled=true;
+    try {
+      message('Создаю проект…'); const created=await api('/projects',{method:'POST',body:new FormData(form)}); projectId=created.project.id;
+      message('Анализирую ключи и строю outline…'); const analyzed=await api(`/projects/${projectId}/analyze`,{method:'POST'});
+      show(analyzed); enableProjectActions(); message(`Проект #${projectId} готов к генерации.`);
+    } catch(error) { message(`Ошибка: ${error.message}`); } finally { button.disabled=false; }
+  });
+  generate.addEventListener('click', async () => {
+    generate.disabled=true; try { message('Генерирую и оцениваю статью…'); const data=await api(`/projects/${projectId}/generate-article`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{"use_mock":false}'}); show(data); message('Статья и оценка готовы.'); }
+    catch(error) { message(`Ошибка: ${error.message}`); } finally { generate.disabled=false; }
+  });
+  refresh.addEventListener('click', async () => { try { show(await api(`/projects/${projectId}`)); message('Данные обновлены.'); } catch(error) { message(`Ошибка: ${error.message}`); } });
+</script>
+</body>
+</html>
