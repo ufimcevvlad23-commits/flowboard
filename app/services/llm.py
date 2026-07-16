@@ -15,8 +15,17 @@ class LLMService:
         self.settings = settings
 
     @staticmethod
-    def build_prompt(topic: str, main_keyword: str, outline: list[OutlineNode], audience: str, style: str, desired_length: int) -> str:
+    def build_prompt(
+        topic: str,
+        main_keyword: str,
+        outline: list[OutlineNode],
+        audience: str,
+        style: str,
+        desired_length: int,
+        source_context: str | None = None,
+    ) -> str:
         structure = "\n".join(f"{'#' * item.level} {item.title}" for item in outline)
+        context = f"\nКонтекст исследования: {source_context}" if source_context else ""
         return f"""Напиши полезную SEO-статью на русском языке.
 Тема: {topic}
 Главный ключ: {main_keyword}
@@ -25,6 +34,7 @@ class LLMService:
 Желаемая длина: около {desired_length} слов.
 Структура:
 {structure}
+{context}
 
 Требования: сохрани иерархию Markdown, используй короткие абзацы и списки, раскрой интент без воды, добавь конкретные шаги, FAQ и естественный CTA. Не выдумывай факты и источники."""
 

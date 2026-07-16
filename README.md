@@ -30,6 +30,7 @@ uvicorn app.main:app --reload
 
 ## API
 
+- `POST /one-click` — принять только `competitor_url`, автоматически извлечь тему и ключевые кластеры, построить outline, сгенерировать и оценить готовую статью;
 - `POST /projects` — создать проект и загрузить ключевые слова;
 - `POST /projects/{id}/analyze` — проанализировать ключи;
 - `GET /projects/{id}` — получить проект;
