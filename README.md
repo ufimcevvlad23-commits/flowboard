@@ -47,11 +47,9 @@ pytest -q
 Для production задайте постоянный `DATABASE_URL` PostgreSQL/Neon. Локальная SQLite подходит только для разработки.
 
 ```powershell
-Copy-Item pyproject.vercel.toml pyproject.toml
-Copy-Item vercel.fastapi.json vercel.json
 vercel link
 vercel env add DATABASE_URL production
 vercel --prod
 ```
 
-`pyproject.vercel.toml` содержит FastAPI entrypoint и production-зависимости, а `vercel.fastapi.json` выбирает FastAPI framework preset.
+`pyproject.toml` содержит FastAPI entrypoint и production-зависимости, а `vercel.json` выбирает FastAPI framework preset.
