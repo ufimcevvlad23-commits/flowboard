@@ -3,7 +3,7 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { AlertTriangle, Archive, CalendarDays, CheckSquare2, CircleCheck, MessageSquare, Paperclip, Pin, PinOff, RotateCcw, UsersRound } from "lucide-react";
+import { AlertTriangle, Archive, CalendarDays, CheckSquare2, CircleCheck, MessageSquare, Pin, PinOff, RotateCcw, UsersRound } from "lucide-react";
 import { format, isBefore, isToday, startOfToday } from "date-fns";
 import { ru } from "date-fns/locale";
 import { cn, priorityMeta } from "@/lib/utils";
@@ -58,7 +58,6 @@ export function TaskCard({ task, listId, onOpen, overlay = false, canEdit }: Tas
         <div className="card-meta">
           {task.dueDate && <span className={cn("due-chip", overdue && "overdue", isToday(new Date(`${task.dueDate}T12:00:00`)) && "today")}><CalendarDays size={13} />{format(new Date(`${task.dueDate}T12:00:00`), "d MMM", { locale: ru })}</span>}
           {task.comments.length > 0 && <span><MessageSquare size={13} />{task.comments.length}</span>}
-          {task.notes && <span><Paperclip size={13} />1</span>}
         </div>
         <span className={cn("task-check", (task.status === "done" || task.closed || (checklist.length > 0 && checklistDone === checklist.length)) && "done")}><CheckSquare2 size={15} /></span>
       </div>

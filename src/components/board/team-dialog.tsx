@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarClock, Eye, KeyRound, Mail, ShieldCheck, Trash2, UserCog, UserPlus, UsersRound } from "lucide-react";
+import { CalendarClock, Check, Eye, KeyRound, Mail, Pencil, ShieldCheck, Trash2, UserCog, UserPlus, UsersRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import { SelectMenu } from "@/components/ui/select-menu";
@@ -35,6 +35,10 @@ export function TeamDialog({ open, onClose, canManage, currentUserId }: TeamDial
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [savingAccessId, setSavingAccessId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editIdentity, setEditIdentity] = useState("");
+  const [savingEmployeeId, setSavingEmployeeId] = useState<string | null>(null);
   const employeeList = Object.values(employees).sort((a, b) => a.status === b.status ? a.name.localeCompare(b.name, "ru") : a.status === "active" ? -1 : 1);
   const activeEmployees = employeeList.filter((employee) => employee.status === "active");
 
@@ -97,6 +101,35 @@ export function TeamDialog({ open, onClose, canManage, currentUserId }: TeamDial
     }
   };
 
+  const startEditing = (employee: Employee) => {
+    setEditingId(employee.id);
+    setEditName(employee.name);
+    setEditIdentity(employee.email || employee.login);
+  };
+
+  const saveEmployee = async (employee: Employee) => {
+    if (!editName.trim()) { toast.error("Введите имя сотрудника"); return; }
+    if (!editIdentity.trim()) { toast.error("Введите email или логин"); return; }
+    setSavingEmployeeId(employee.id);
+    try {
+      const login = editIdentity.trim().toLocaleLowerCase("ru");
+      const response = await fetch(`/api/employees/${encodeURIComponent(employee.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editName.trim(), login, email: login.includes("@") ? login : "" }),
+      });
+      const result = await response.json() as { employee?: Employee; error?: string };
+      if (!response.ok || !result.employee) throw new Error(result.error || "Не удалось обновить сотрудника");
+      upsertEmployee(result.employee);
+      setEditingId(null);
+      toast.success(`Данные сотрудника «${result.employee.name}» обновлены`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Не удалось обновить сотрудника");
+    } finally {
+      setSavingEmployeeId(null);
+    }
+  };
+
   return (
     <Modal open={open} onClose={onClose} title="Сотрудники" description="Учётные записи и доступ к рабочему пространству" size="sm">
       {canManage && <div className="team-tabs" role="tablist" aria-label="Управление сотрудниками">
@@ -118,8 +151,17 @@ export function TeamDialog({ open, onClose, canManage, currentUserId }: TeamDial
             {employeeList.map((employee) => (
               <div className={cn("employee-row", employee.status === "deleted" && "deleted")} key={employee.id}>
                 <span className="employee-avatar" style={{ background: employeeColor(employee.id) }}>{employeeInitials(employee.name)}</span>
-                <div className="employee-details"><div><strong>{employee.name}</strong><span className={cn("employee-status", employee.status)}>{employee.status === "active" ? "Активен" : "Удалён"}</span></div><span>{employee.email ? <Mail size={11} /> : <KeyRound size={11} />}{employee.email || employee.login}</span><small className={`role-badge role-${employee.role}`}>{roleLabels[employee.role]}</small></div>
-                {canManage && employee.status === "active" && employee.id !== currentUserId && employee.role !== "admin" && <button className="icon-button small employee-delete" onClick={() => void removeEmployee(employee)} disabled={deletingId === employee.id} aria-label={`Удалить сотрудника ${employee.name}`}><Trash2 size={14} /></button>}
+                {editingId === employee.id ? <div className="employee-edit-fields">
+                  <input value={editName} onChange={(event) => setEditName(event.target.value)} placeholder="Имя сотрудника" aria-label="Имя сотрудника" autoFocus />
+                  <input value={editIdentity} onChange={(event) => setEditIdentity(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void saveEmployee(employee)} placeholder="Email или логин" aria-label="Email или логин сотрудника" />
+                </div> : <div className="employee-details"><div><strong>{employee.name}</strong><span className={cn("employee-status", employee.status)}>{employee.status === "active" ? "Активен" : "Удалён"}</span></div><span>{employee.email ? <Mail size={11} /> : <KeyRound size={11} />}{employee.email || employee.login}</span><small className={`role-badge role-${employee.role}`}>{roleLabels[employee.role]}</small></div>}
+                {canManage && employee.status === "active" && <div className="employee-actions">
+                  {editingId === employee.id ? <>
+                    <button className="icon-button small employee-save" onClick={() => void saveEmployee(employee)} disabled={savingEmployeeId === employee.id} aria-label={`Сохранить данные сотрудника ${employee.name}`}><Check size={14} /></button>
+                    <button className="icon-button small" onClick={() => setEditingId(null)} disabled={savingEmployeeId === employee.id} aria-label="Отменить редактирование"><X size={14} /></button>
+                  </> : <button className="icon-button small" onClick={() => startEditing(employee)} aria-label={`Редактировать сотрудника ${employee.name}`}><Pencil size={14} /></button>}
+                  {employee.id !== currentUserId && employee.role !== "admin" && editingId !== employee.id && <button className="icon-button small employee-delete" onClick={() => void removeEmployee(employee)} disabled={deletingId === employee.id} aria-label={`Удалить сотрудника ${employee.name}`}><Trash2 size={14} /></button>}
+                </div>}
               </div>
             ))}
             {employeeList.length === 0 && <div className="employee-empty">Добавьте первого сотрудника</div>}
