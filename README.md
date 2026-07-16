@@ -63,12 +63,13 @@ pytest -q
 
 ```powershell
 Copy-Item pyproject.vercel.toml pyproject.toml
+Copy-Item vercel.fastapi.json vercel.json
 vercel link
 vercel env add DATABASE_URL production
 vercel --prod
 ```
 
-`pyproject.vercel.toml` содержит явный FastAPI entrypoint и production-зависимости. При отдельном деплое скопируйте его как `pyproject.toml`; отдельное имя не позволяет Vercel-проекту Flowboard ошибочно определить Python как основной framework. Драйвер `psycopg` подключён в `requirements.txt`; адреса `postgres://` и `postgresql://` автоматически нормализуются для SQLAlchemy/psycopg 3.
+`pyproject.vercel.toml` содержит явный FastAPI entrypoint и production-зависимости, а `vercel.fastapi.json` принудительно выбирает FastAPI framework preset. При отдельном деплое скопируйте их под стандартными именами; отдельные исходные имена не позволяют Vercel-проекту Flowboard ошибочно определить Python как основной framework. Драйвер `psycopg` подключён в `requirements.txt`; адреса `postgres://` и `postgresql://` автоматически нормализуются для SQLAlchemy/psycopg 3.
 
 Production-ready канбан-приложение для управления проектами, списками и задачами. Рабочее пространство защищено серверной авторизацией и хранится в Neon Postgres.
 
