@@ -5,78 +5,72 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>SEO Article Factory</title>
   <style>
-    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; background:#0c1220; color:#e8edf7 }
-    * { box-sizing:border-box } body { margin:0; background:radial-gradient(circle at top left,#1b3155 0,#0c1220 42%); min-height:100vh }
-    main { width:min(1120px,calc(100% - 32px)); margin:auto; padding:48px 0 72px }
-    header { display:flex; justify-content:space-between; gap:24px; align-items:end; margin-bottom:28px }
-    h1 { margin:0; font-size:clamp(28px,5vw,52px); letter-spacing:-.04em } header p { margin:8px 0 0; color:#9eabc0 }
-    a { color:#8fc5ff } .grid { display:grid; grid-template-columns:minmax(300px,420px) 1fr; gap:20px }
-    .card { background:rgba(17,26,44,.92); border:1px solid #2a3852; border-radius:18px; padding:22px; box-shadow:0 18px 60px #05081266 }
-    label { display:block; color:#b9c5d7; font-size:13px; margin:14px 0 6px }
-    input,textarea,select,button { width:100%; border-radius:10px; border:1px solid #34445f; padding:11px 12px; font:inherit }
-    input,textarea,select { background:#0d1627; color:#fff } textarea { min-height:96px; resize:vertical }
-    button { background:#4f96ff; color:#07101f; border:0; font-weight:750; cursor:pointer; margin-top:12px }
-    button.secondary { background:#22324c; color:#e8edf7 } button:disabled { opacity:.5; cursor:wait }
-    .actions { display:grid; grid-template-columns:1fr 1fr; gap:10px }
-    .status { min-height:24px; color:#9fb2cd; margin:14px 0 0 }
-    pre { white-space:pre-wrap; overflow-wrap:anywhere; background:#0a111e; border-radius:12px; padding:16px; min-height:280px; max-height:720px; overflow:auto; color:#d8e4f5 }
-    .exports { display:flex; gap:12px; flex-wrap:wrap; min-height:24px } .exports a { display:none }
-    @media (max-width:820px) { .grid { grid-template-columns:1fr } header { align-items:start; flex-direction:column } }
+    :root { color-scheme:dark; font-family:Inter,system-ui,sans-serif; background:#08111f; color:#edf4ff }
+    * { box-sizing:border-box } body { margin:0; min-height:100vh; background:radial-gradient(circle at 20% 0,#17345f 0,#08111f 43%) }
+    main { width:min(1100px,calc(100% - 32px)); margin:auto; padding:56px 0 80px }
+    header { margin-bottom:30px } h1 { margin:0; font-size:clamp(34px,7vw,68px); letter-spacing:-.055em; line-height:1 }
+    header p { color:#aebbd0; font-size:18px; margin:16px 0 0; max-width:700px }
+    .panel { background:#101c2fdd; border:1px solid #293b59; border-radius:22px; padding:24px; box-shadow:0 26px 70px #02071180 }
+    form { display:grid; grid-template-columns:1fr auto; gap:12px } input,button { border-radius:13px; padding:15px 17px; font:inherit }
+    input { min-width:0; color:#fff; background:#091426; border:1px solid #405374; outline:none }
+    input:focus { border-color:#6caaff; box-shadow:0 0 0 3px #3f8cff33 }
+    button { border:0; background:#69a9ff; color:#06101e; font-weight:800; cursor:pointer; min-width:230px }
+    button:disabled { opacity:.55; cursor:wait } .status { min-height:24px; margin:14px 2px 0; color:#b5c5dd }
+    .progress { display:none; height:4px; background:#1e304b; overflow:hidden; border-radius:99px; margin-top:16px }
+    .progress::after { content:""; display:block; width:35%; height:100%; background:#69a9ff; animation:move 1.1s infinite ease-in-out }
+    .loading .progress { display:block } @keyframes move { from{transform:translateX(-100%)} to{transform:translateX(390%)} }
+    .result { display:none; margin-top:22px; grid-template-columns:1fr 300px; gap:18px } .result.ready { display:grid }
+    .article,.summary { background:#0c1728; border:1px solid #263956; border-radius:18px; padding:22px }
+    pre { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font:15px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace; max-height:720px; overflow:auto }
+    h2 { margin-top:0 } .score { font-size:46px; font-weight:850; color:#7eb7ff; letter-spacing:-.05em }
+    .chips { display:flex; flex-wrap:wrap; gap:7px }.chip { border:1px solid #344a6a; border-radius:99px; padding:5px 9px; font-size:12px; color:#c9d8ec }
+    .exports { display:flex; gap:10px; margin-top:18px }.exports a { color:#a9ceff }
+    .help { margin-top:14px; font-size:13px; color:#8092ad }.help a { color:#9bc6ff }
+    @media(max-width:760px){ form{grid-template-columns:1fr} button{min-width:0}.result.ready{grid-template-columns:1fr} }
   </style>
 </head>
 <body>
 <main>
-  <header><div><h1>SEO Article Factory</h1><p>Ключи → структура → статья → оценка → экспорт</p></div><a href="/docs">API / Swagger</a></header>
-  <div class="grid">
-    <form id="project-form" class="card">
-      <h2>Новый проект</h2>
-      <label for="topic">Тема статьи *</label><input id="topic" name="topic" required placeholder="Например, автоматизация SEO">
-      <label for="url">URL конкурента</label><input id="url" name="competitor_url" type="url" placeholder="https://example.com/article">
-      <label for="keyword_text">Ключевые слова</label><textarea id="keyword_text" name="keyword_text" placeholder="Один ключ на строку"></textarea>
-      <label for="keyword_file">Или файл CSV / XLSX / TXT</label><input id="keyword_file" name="keyword_file" type="file" accept=".csv,.xlsx,.txt">
-      <label for="outline">Структура из ТЗ (необязательно)</label><textarea id="outline" name="source_outline" placeholder="# H1&#10;## Раздел"></textarea>
-      <label for="audience">Целевая аудитория</label><input id="audience" name="target_audience" value="широкая аудитория">
-      <label for="style">Стиль</label><input id="style" name="writing_style" value="экспертный инфостиль">
-      <label for="length">Длина, слов</label><input id="length" name="desired_length" type="number" min="300" max="10000" value="1500">
-      <button id="create" type="submit">Создать и проанализировать</button>
-      <div class="actions"><button id="generate" type="button" class="secondary" disabled>Сгенерировать статью</button><button id="refresh" type="button" class="secondary" disabled>Обновить данные</button></div>
-      <p id="status" class="status" role="status"></p>
-      <div id="exports" class="exports"><a data-format="json">JSON</a><a data-format="csv">CSV</a><a data-format="xlsx">XLSX</a></div>
+  <header>
+    <h1>Статья из одной ссылки</h1>
+    <p>Вставьте страницу конкурента. Сервис сам найдёт тему и ключевые кластеры, построит структуру и подготовит готовую SEO-статью.</p>
+  </header>
+  <section id="panel" class="panel">
+    <form id="one-click-form">
+      <input id="url" type="url" required autocomplete="url" placeholder="https://competitor.ru/article" aria-label="Ссылка на сайт конкурента">
+      <button id="submit" type="submit">Создать статью</button>
     </form>
-    <section class="card"><h2>Результат</h2><pre id="result">Создайте проект, чтобы увидеть outline, статью и SEO-оценку.</pre></section>
-  </div>
+    <div class="progress" aria-hidden="true"></div>
+    <p id="status" class="status" role="status">Нужна только публичная HTML-страница с содержательным текстом.</p>
+    <div id="result" class="result">
+      <article class="article"><h2 id="article-title">Готовая статья</h2><pre id="article"></pre></article>
+      <aside class="summary">
+        <h2>SEO-результат</h2><div id="score" class="score">—</div>
+        <p>Ключевые кластеры</p><div id="keywords" class="chips"></div>
+        <div id="exports" class="exports"><a data-format="json">JSON</a><a data-format="csv">CSV</a><a data-format="xlsx">XLSX</a></div>
+      </aside>
+    </div>
+    <p class="help"><a href="/docs">API и Swagger</a> · Исходный текст конкурента не копируется — используется только семантика и поисковый интент.</p>
+  </section>
 </main>
 <script>
-  let projectId = null;
-  const form = document.querySelector('#project-form');
-  const statusEl = document.querySelector('#status');
-  const result = document.querySelector('#result');
-  const generate = document.querySelector('#generate');
-  const refresh = document.querySelector('#refresh');
-  const show = data => { result.textContent = JSON.stringify(data, null, 2); };
-  const message = text => { statusEl.textContent = text; };
-  async function api(url, options={}) {
-    const response = await fetch(url, options); const data = await response.json();
-    if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail));
-    return data;
-  }
-  function enableProjectActions() {
-    generate.disabled = refresh.disabled = false;
-    document.querySelectorAll('#exports a').forEach(link => { link.style.display='inline'; link.href=`/projects/${projectId}/export?format=${link.dataset.format}`; });
-  }
-  form.addEventListener('submit', async event => {
-    event.preventDefault(); const button=document.querySelector('#create'); button.disabled=true;
-    try {
-      message('Создаю проект…'); const created=await api('/projects',{method:'POST',body:new FormData(form)}); projectId=created.project.id;
-      message('Анализирую ключи и строю outline…'); const analyzed=await api(`/projects/${projectId}/analyze`,{method:'POST'});
-      show(analyzed); enableProjectActions(); message(`Проект #${projectId} готов к генерации.`);
-    } catch(error) { message(`Ошибка: ${error.message}`); } finally { button.disabled=false; }
+  const form=document.querySelector('#one-click-form'),panel=document.querySelector('#panel'),button=document.querySelector('#submit');
+  const statusEl=document.querySelector('#status'),result=document.querySelector('#result');
+  form.addEventListener('submit',async event=>{
+    event.preventDefault(); button.disabled=true; panel.classList.add('loading'); result.classList.remove('ready');
+    statusEl.textContent='Анализирую страницу, собираю ключевые кластеры и создаю статью…';
+    try{
+      const response=await fetch('/one-click',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({competitor_url:document.querySelector('#url').value})});
+      const data=await response.json(); if(!response.ok) throw new Error(typeof data.detail==='string'?data.detail:JSON.stringify(data.detail));
+      const article=data.articles[0],score=data.scores[0];
+      document.querySelector('#article-title').textContent=article.title;
+      document.querySelector('#article').textContent=article.content;
+      document.querySelector('#score').textContent=`${score.overall_score}/20`;
+      const chips=document.querySelector('#keywords'); chips.replaceChildren(...data.keywords.slice(0,12).map(item=>{const span=document.createElement('span');span.className='chip';span.textContent=item.phrase;return span;}));
+      document.querySelectorAll('#exports a').forEach(link=>link.href=`/projects/${data.project.id}/export?format=${link.dataset.format}`);
+      result.classList.add('ready'); statusEl.textContent=`Статья готова: ${score.word_count} слов, ${data.keywords.length} ключевых фраз.`;
+    }catch(error){statusEl.textContent=`Ошибка: ${error.message}`;}finally{button.disabled=false;panel.classList.remove('loading');}
   });
-  generate.addEventListener('click', async () => {
-    generate.disabled=true; try { message('Генерирую и оцениваю статью…'); const data=await api(`/projects/${projectId}/generate-article`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{"use_mock":false}'}); show(data); message('Статья и оценка готовы.'); }
-    catch(error) { message(`Ошибка: ${error.message}`); } finally { generate.disabled=false; }
-  });
-  refresh.addEventListener('click', async () => { try { show(await api(`/projects/${projectId}`)); message('Данные обновлены.'); } catch(error) { message(`Ошибка: ${error.message}`); } });
 </script>
 </body>
 </html>

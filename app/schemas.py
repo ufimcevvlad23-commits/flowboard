@@ -27,6 +27,15 @@ class GenerateArticleRequest(BaseModel):
     use_mock: bool = False
 
 
+class OneClickRequest(BaseModel):
+    competitor_url: HttpUrl
+    desired_length: int = Field(default=1500, ge=300, le=10000)
+    target_audience: str = Field(default="широкая аудитория", max_length=500)
+    writing_style: str = Field(default="экспертный инфостиль", max_length=120)
+    use_mock: bool = False
+    keyword_limit: int = Field(default=20, ge=5, le=50)
+
+
 class ScorePayload(BaseModel):
     word_count: int
     promotion_keywords: list[str]
