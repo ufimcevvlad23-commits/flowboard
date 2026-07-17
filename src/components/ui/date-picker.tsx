@@ -23,7 +23,7 @@ export function DatePicker({ value, onChange, disabled = false, disabledReason, 
   const today = new Date();
   const [open, setOpen] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(selectedDate ?? today));
-  const [position, setPosition] = useState<{ top: number; left: number; width: number; maxHeight: number; visibility: "hidden" | "visible" }>({ top: 12, left: 12, width: 320, maxHeight: 400, visibility: "hidden" });
+  const [position, setPosition] = useState<{ top: number; left: number; width: number; maxHeight: number; visibility: "hidden" | "visible" }>({ top: 12, left: 12, width: 264, maxHeight: 360, visibility: "hidden" });
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -47,7 +47,7 @@ export function DatePicker({ value, onChange, disabled = false, disabledReason, 
       const viewportHeight = viewport?.height ?? window.innerHeight;
       const safe = 12;
       const gap = 8;
-      const width = Math.min(320, Math.max(1, viewportWidth - safe * 2));
+      const width = Math.min(264, Math.max(1, viewportWidth - safe * 2));
       const measuredHeight = popover.scrollHeight;
       const maxHeight = Math.max(1, viewportHeight - safe * 2);
       const height = Math.min(measuredHeight, maxHeight);
