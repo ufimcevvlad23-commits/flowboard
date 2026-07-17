@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, AtSign, Bell, CalendarClock, Filter, LogOut, Menu, Moon, Search, SlidersHorizontal, Sun, X } from "lucide-react";
 import { SelectMenu } from "@/components/ui/select-menu";
-import type { Filters, Priority, SessionUser, TaskStatus } from "@/types/board";
-import { employeeInitials, priorityMeta, statusMeta } from "@/lib/utils";
+import type { Filters, Priority, SessionUser } from "@/types/board";
+import { employeeInitials, priorityMeta } from "@/lib/utils";
 
 export interface TaskNotification {
   id: string;
@@ -33,7 +33,7 @@ interface TopbarProps {
 export function Topbar({ currentUser, search, onSearch, filters, onFilters, filterOpen, onFilterOpen, dark, onThemeToggle, onMobileMenu, labels, notifications, onOpenNotification }: TopbarProps) {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
-  const activeCount = filters.priorities.length + filters.statuses.length + (filters.label ? 1 : 0) + (filters.due !== "all" ? 1 : 0);
+  const activeCount = filters.priorities.length + (filters.label ? 1 : 0) + (filters.due !== "all" ? 1 : 0);
   const toggle = <T extends string>(items: T[], value: T) => items.includes(value) ? items.filter((item) => item !== value) : [...items, value];
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -68,10 +68,7 @@ export function Topbar({ currentUser, search, onSearch, filters, onFilters, filt
               <div className="filter-group"><label>Приоритет</label><div className="chip-grid">
                 {(Object.keys(priorityMeta) as Priority[]).map((value) => <button key={value} className={filters.priorities.includes(value) ? "active" : ""} onClick={() => onFilters({ ...filters, priorities: toggle(filters.priorities, value) })}>{priorityMeta[value].label}</button>)}
               </div></div>
-              <div className="filter-group"><label>Статус</label><div className="chip-grid">
-                {(Object.keys(statusMeta) as TaskStatus[]).map((value) => <button key={value} className={filters.statuses.includes(value) ? "active" : ""} onClick={() => onFilters({ ...filters, statuses: toggle(filters.statuses, value) })}>{statusMeta[value]}</button>)}
-              </div></div>
-              <div className="filter-group"><label>Метка</label><SelectMenu compact value={filters.label} ariaLabel="Фильтр по метке" options={[{ value: "", label: "Любая" }, ...labels.map((label) => ({ value: label, label }))]} onChange={(value) => onFilters({ ...filters, label: value })} /></div>
+              <div className="filter-group"><label>Тег</label><SelectMenu compact value={filters.label} ariaLabel="Фильтр по тегу" options={[{ value: "", label: "Любой" }, ...labels.map((label) => ({ value: label, label }))]} onChange={(value) => onFilters({ ...filters, label: value })} /></div>
               <div className="filter-group"><label>Срок</label><SelectMenu compact value={filters.due} ariaLabel="Фильтр по сроку" options={[{ value: "all", label: "Любой" }, { value: "overdue", label: "Просрочено" }, { value: "today", label: "Сегодня" }, { value: "week", label: "На этой неделе" }]} onChange={(value) => onFilters({ ...filters, due: value as Filters["due"] })} /></div>
             </div>
           )}

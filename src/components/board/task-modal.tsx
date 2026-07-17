@@ -1,8 +1,8 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- comment screenshots are user-provided data URLs */
 
-import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
-import { AlertTriangle, Archive, CalendarClock, Check, CircleCheck, Eye, Flag, ListChecks, MessageSquare, Paperclip, Plus, RotateCcw, Tag, Trash2, UserRoundCheck, X } from "lucide-react";
+import { useEffect, useRef, useState, type ChangeEvent, type ClipboardEvent as ReactClipboardEvent, type ReactNode } from "react";
+import { AlertTriangle, Archive, Check, CircleCheck, Eye, Flag, MessageSquare, Paperclip, Plus, RotateCcw, Tag, Trash2, UserRoundPlus, X } from "lucide-react";
 import { formatDistanceToNow, isBefore, startOfToday } from "date-fns";
 import { ru } from "date-fns/locale";
 import { toast } from "sonner";
@@ -71,6 +71,7 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines, currentU
   const [mentionStart, setMentionStart] = useState<number | null>(null);
   const [newItemTitle, setNewItemTitle] = useState("");
   const [tagOpen, setTagOpen] = useState(false);
+  const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [newTag, setNewTag] = useState("");
   const autoSaveReady = useRef(false);
   const commentRef = useRef<HTMLTextAreaElement>(null);
@@ -96,7 +97,7 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines, currentU
     })
     .slice(0, 6);
   const deletedAssignees = draft.assigneeIds.map((id) => employees[id]).filter((employee) => employee?.status === "deleted");
-  const completedItems = draft.checklist.filter((item) => item.completed).length;
+  const assignedEmployees = draft.assigneeIds.map((id) => employees[id]).filter((employee) => employee?.status === "active");
   const allLabels = [...new Set(Object.values(tasks).flatMap((item) => item.labels))].sort((a, b) => a.localeCompare(b, "ru"));
   const toggleAssignee = (employeeId: string) => setDraft((current) => ({ ...current, assigneeIds: current.assigneeIds.includes(employeeId) ? current.assigneeIds.filter((id) => id !== employeeId) : [...current.assigneeIds, employeeId] }));
   const updateChecklistItem = (id: string, updates: Partial<ChecklistItem>) => setDraft((current) => ({ ...current, checklist: current.checklist.map((item) => item.id === id ? { ...item, ...updates } : item) }));
@@ -132,14 +133,26 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines, currentU
     setMentionStart(null);
     requestAnimationFrame(() => { commentRef.current?.focus(); commentRef.current?.setSelectionRange(mentionStart + employee.name.length + 2, mentionStart + employee.name.length + 2); });
   };
-  const addImages = async (event: ChangeEvent<HTMLInputElement>) => {
-    const files = [...(event.target.files ?? [])].slice(0, Math.max(0, 4 - attachments.length));
+  const appendImages = async (incomingFiles: File[]) => {
+    const availableSlots = Math.max(0, 4 - attachments.length);
+    if (availableSlots === 0) { toast.error("Можно прикрепить не более четырёх изображений"); return; }
+    const files = incomingFiles.filter((file) => file.type.startsWith("image/")).slice(0, availableSlots);
+    if (files.length === 0) return;
     try {
       const nextAttachments = await Promise.all(files.map(readImage));
       setAttachments((current) => [...current, ...nextAttachments]);
     }
     catch (error) { toast.error(error instanceof Error ? error.message : "Не удалось добавить изображение"); }
+  };
+  const addImages = async (event: ChangeEvent<HTMLInputElement>) => {
+    await appendImages([...(event.target.files ?? [])]);
     event.target.value = "";
+  };
+  const pasteImages = (event: ReactClipboardEvent<HTMLTextAreaElement>) => {
+    const files = [...event.clipboardData.items].map((item) => item.kind === "file" ? item.getAsFile() : null).filter((file): file is File => Boolean(file?.type.startsWith("image/")));
+    if (files.length === 0) return;
+    event.preventDefault();
+    void appendImages(files);
   };
   const sendComment = () => {
     const text = comment.trim();
@@ -150,7 +163,7 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines, currentU
   };
 
   return (
-    <Modal open onClose={onClose} title="Карточка задачи" size="lg">
+    <Modal open onClose={onClose} title="" size="lg">
       <div className="task-modal-grid">
         <div className="task-editor">
           <label className="field task-title-field"><span>Название</span><textarea rows={2} value={draft.title} readOnly={!canEdit} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} /></label>
@@ -158,16 +171,20 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines, currentU
             <SelectMenu compact iconOnly icon={<Flag size={16} style={{ color: priorityMeta[draft.priority].color }} />} title={`Приоритет: ${priorityMeta[draft.priority].label}`} value={draft.priority} disabled={!canEdit} ariaLabel="Приоритет" options={(Object.keys(priorityMeta) as Priority[]).map((value) => ({ value, label: priorityMeta[value].label }))} onChange={(value) => setDraft((current) => ({ ...current, priority: value as Priority }))} />
             <DatePicker compact iconOnly value={draft.dueDate} onChange={(dueDate) => setDraft((current) => ({ ...current, dueDate }))} disabled={!canEdit || !canEditDeadlines} disabledReason={!canEdit ? "Гостю доступен только просмотр" : "Нет права изменять дедлайны"} />
             <div className="task-tag-control"><button type="button" className={cn("task-property-button", draft.labels.length > 0 && "active")} onClick={() => setTagOpen((open) => !open)} disabled={!canEdit} aria-label="Теги задачи" aria-expanded={tagOpen}><Tag size={16} />{draft.labels.length > 0 && <b>{draft.labels.length}</b>}</button>{tagOpen && <div className="task-tag-popover"><strong>Теги</strong>{allLabels.map((label) => <button type="button" className={draft.labels.includes(label) ? "selected" : ""} key={label} onClick={() => toggleLabel(label)}><span>{label}</span>{draft.labels.includes(label) && <Check size={13} />}</button>)}{allLabels.length === 0 && <small>Тегов пока нет — создайте первый.</small>}<div><input value={newTag} onChange={(event) => setNewTag(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createLabel(); } }} placeholder="Новый тег" /><button type="button" onClick={createLabel} disabled={!newTag.trim()}><Plus size={13} /></button></div></div>}</div>
+            <div className="task-assignee-control"><button type="button" className={cn("task-property-button", assignedEmployees.length > 0 && "active")} onClick={() => setAssigneeOpen((open) => !open)} disabled={!canEdit} aria-label="Ответственные" aria-expanded={assigneeOpen}><UserRoundPlus size={16} />{assignedEmployees.length > 0 && <b>{assignedEmployees.length}</b>}</button>{assigneeOpen && <div className="task-assignee-popover"><strong>Ответственные</strong>{employeeList.map((employee) => { const selected = draft.assigneeIds.includes(employee.id); return <button type="button" className={selected ? "selected" : ""} key={employee.id} onClick={() => toggleAssignee(employee.id)}><span className="employee-avatar" style={{ background: employeeColor(employee.id) }}>{employeeInitials(employee.name)}</span><span>{employee.name}</span>{selected && <Check size={13} />}</button>; })}{employeeList.length === 0 && <small>Нет активных сотрудников</small>}{deletedAssignees.length > 0 && <small>Удалённые назначения будут сняты автоматически.</small>}</div>}</div>
+            {assignedEmployees.map((employee) => <span className="employee-avatar task-property-avatar" style={{ background: employeeColor(employee.id) }} title={employee.name} key={employee.id}>{employeeInitials(employee.name)}</span>)}
             {draft.labels.map((label) => <span className="task-property-tag" key={label}>{label}</span>)}
           </div>
           <section className="checklist-block" aria-labelledby="checklist-title">
-            <div className="checklist-heading"><div><ListChecks size={16} /><strong id="checklist-title">Подзадачи</strong><span>{completedItems}/{draft.checklist.length}</span></div></div>
+            <div className="checklist-heading"><div><strong id="checklist-title">Подзадачи</strong></div></div>
             <div className="checklist-items">
               {draft.checklist.map((item) => {
                 const overdue = Boolean(item.dueDate && !item.completed && isBefore(new Date(`${item.dueDate}T23:59:59`), startOfToday()));
                 return <div className={cn("checklist-item", item.completed && "completed", overdue && "overdue")} key={item.id}>
                   <button type="button" className="checklist-toggle" disabled={!canEdit} onClick={() => updateChecklistItem(item.id, { completed: !item.completed })} aria-label={item.completed ? "Вернуть пункт в работу" : "Отметить пункт выполненным"} aria-pressed={item.completed}>{item.completed && <Check size={14} />}</button>
-                  <div className="checklist-item-main"><input value={item.title} readOnly={!canEdit} onChange={(event) => updateChecklistItem(item.id, { title: event.target.value })} aria-label="Название пункта чек-листа" /><div className="checklist-item-meta"><div className="checklist-date"><CalendarClock size={13} /><DatePicker compact value={item.dueDate} onChange={(dueDate) => updateChecklistItem(item.id, { dueDate })} disabled={!canEdit || !canEditDeadlines} disabledReason={!canEdit ? "Гостю доступен только просмотр" : "Нет права изменять дедлайны"} /></div>{overdue && <span className="checklist-overdue"><AlertTriangle size={12} />Просрочено</span>}</div></div>
+                  <input className="checklist-title-input" value={item.title} readOnly={!canEdit} onChange={(event) => updateChecklistItem(item.id, { title: event.target.value })} aria-label="Название пункта чек-листа" />
+                  <div className="checklist-date"><DatePicker compact value={item.dueDate} onChange={(dueDate) => updateChecklistItem(item.id, { dueDate })} disabled={!canEdit || !canEditDeadlines} disabledReason={!canEdit ? "Гостю доступен только просмотр" : "Нет права изменять дедлайны"} /></div>
+                  {overdue && <span className="checklist-overdue" title="Дедлайн подзадачи просрочен"><AlertTriangle size={13} /></span>}
                   {canEdit && <button type="button" className="checklist-delete" onClick={() => setDraft((current) => ({ ...current, checklist: current.checklist.filter((currentItem) => currentItem.id !== item.id) }))} aria-label="Удалить пункт"><Trash2 size={14} /></button>}
                 </div>;
               })}
@@ -175,12 +192,11 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines, currentU
             </div>
             {canEdit && <div className="checklist-add"><input value={newItemTitle} onChange={(event) => setNewItemTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addChecklistItem(); } }} placeholder="Новая подзадача" aria-label="Новая подзадача" /><button type="button" className="button secondary compact" onClick={addChecklistItem} disabled={!newItemTitle.trim()}><Plus size={14} />Добавить</button></div>}
           </section>
-          <div className="field assignee-field"><span><UserRoundCheck size={13} />Ответственные</span>{employeeList.length > 0 ? <div className="assignee-picker">{employeeList.map((employee) => { const selected = draft.assigneeIds.includes(employee.id); return <label className={cn(selected && "selected", !canEdit && "readonly")} key={employee.id}><input type="checkbox" checked={selected} disabled={!canEdit} onChange={() => toggleAssignee(employee.id)} /><span className="employee-avatar" style={{ background: employeeColor(employee.id) }}>{employeeInitials(employee.name)}</span><span><strong>{employee.name}</strong><small>{employee.email || employee.login}</small></span><i>{selected ? "Назначен" : canEdit ? "Назначить" : "Не назначен"}</i></label>; })}</div> : <div className="assignee-empty">Нет активных сотрудников для назначения.</div>}{deletedAssignees.length > 0 && <div className="deleted-assignee-note">Удалённые сотрудники будут сняты с задачи: {deletedAssignees.map((employee) => employee.name).join(", ")}.</div>}</div>
         </div>
         <aside className="activity-panel">
           <div className="activity-heading"><MessageSquare size={16} /><span>Обсуждение</span><b>{task.comments.length}</b></div>
           <div className="comment-list">{task.comments.map((item) => <div className="comment" key={item.id}><div className="avatar small-avatar">{item.author.slice(0, 1)}</div><div><header><strong>{item.author}</strong><time>{formatDistanceToNow(new Date(item.createdAt), { addSuffix: true, locale: ru })}</time></header>{item.text && <p>{renderMentions(item.text, employeeList)}</p>}{(item.attachments ?? []).length > 0 && <div className="comment-images">{item.attachments.map((attachment) => <a href={attachment.dataUrl} target="_blank" rel="noreferrer" key={attachment.id} title={attachment.name}><img src={attachment.dataUrl} alt={attachment.name} /></a>)}</div>}</div></div>)}{task.comments.length === 0 && <div className="empty-comments">Начните обсуждение задачи</div>}</div>
-          {canEdit && <div className="comment-form"><textarea ref={commentRef} value={comment} onChange={(event) => updateComment(event.target.value, event.target.selectionStart)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (mentionQuery !== null && mentionEmployees[0]) insertMention(mentionEmployees[0]); else sendComment(); } }} placeholder="Комментарий… @ — упомянуть, Shift+Enter — новая строка" />{mentionQuery !== null && <div className="mention-popover"><div className="mention-title">Упомянуть сотрудника</div>{mentionEmployees.map((employee) => <button type="button" key={employee.id} onClick={() => insertMention(employee)}><span className="employee-avatar" style={{ background: employeeColor(employee.id) }}>{employeeInitials(employee.name)}</span><span><strong>{employee.name}</strong><small>{employee.email || employee.login}</small></span></button>)}{mentionEmployees.length === 0 && <span className="mention-empty">Сотрудники не найдены</span>}</div>}{attachments.length > 0 && <div className="pending-images">{attachments.map((attachment) => <div key={attachment.id}><img src={attachment.dataUrl} alt={attachment.name} /><button type="button" onClick={() => setAttachments((current) => current.filter((item) => item.id !== attachment.id))} aria-label={`Убрать ${attachment.name}`}><X size={12} /></button></div>)}</div>}<div className="comment-actions"><input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={(event) => void addImages(event)} /><button type="button" className="icon-button" onClick={() => fileInputRef.current?.click()} disabled={attachments.length >= 4} aria-label="Добавить скриншот" title="Добавить скриншот"><Paperclip size={16} /></button><button className="button secondary compact" onClick={sendComment} disabled={!comment.trim() && attachments.length === 0}>Отправить</button></div></div>}
+          {canEdit && <div className="comment-form"><textarea ref={commentRef} value={comment} onChange={(event) => updateComment(event.target.value, event.target.selectionStart)} onPaste={pasteImages} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (mentionQuery !== null && mentionEmployees[0]) insertMention(mentionEmployees[0]); else sendComment(); } }} placeholder="Комментарий… @ — упомянуть, Ctrl+V — вставить скриншот" />{mentionQuery !== null && <div className="mention-popover"><div className="mention-title">Упомянуть сотрудника</div>{mentionEmployees.map((employee) => <button type="button" key={employee.id} onClick={() => insertMention(employee)}><span className="employee-avatar" style={{ background: employeeColor(employee.id) }}>{employeeInitials(employee.name)}</span><span><strong>{employee.name}</strong><small>{employee.email || employee.login}</small></span></button>)}{mentionEmployees.length === 0 && <span className="mention-empty">Сотрудники не найдены</span>}</div>}{attachments.length > 0 && <div className="pending-images">{attachments.map((attachment) => <div key={attachment.id}><img src={attachment.dataUrl} alt={attachment.name} /><button type="button" onClick={() => setAttachments((current) => current.filter((item) => item.id !== attachment.id))} aria-label={`Убрать ${attachment.name}`}><X size={12} /></button></div>)}</div>}<div className="comment-actions"><input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={(event) => void addImages(event)} /><button type="button" className="icon-button" onClick={() => fileInputRef.current?.click()} disabled={attachments.length >= 4} aria-label="Добавить скриншот" title="Добавить скриншот"><Paperclip size={16} /></button><button className="button secondary compact" onClick={sendComment} disabled={!comment.trim() && attachments.length === 0}>Отправить</button></div></div>}
         </aside>
       </div>
       <footer className="modal-actions task-actions">{canEdit ? <div><button className={`button ghost ${task.closed ? "reopen-task" : "close-task"}`} onClick={() => { toggleTaskClosed(task.id); toast.success(task.closed ? "Задача снова открыта" : "Задача закрыта и перемещена вниз"); onClose(); }}>{task.closed ? <RotateCcw size={15} /> : <CircleCheck size={15} />}{task.closed ? "Открыть снова" : "Закрыть задачу"}</button><button className="button ghost" onClick={() => { updateTask(task.id, { archived: true }); toast.success("Задача в архиве"); onClose(); }}><Archive size={15} />В архив</button><button className="button ghost danger-text" onClick={() => { if (window.confirm("Удалить задачу без возможности восстановления?")) { deleteTask(task.id); toast.success("Задача удалена"); onClose(); } }}><Trash2 size={15} />Удалить</button></div> : <span className="readonly-mode-note"><Eye size={14} />Только просмотр</span>}<div className="task-close-group">{canEdit && <span className="autosave-note">Изменения сохраняются автоматически</span>}<button className="button secondary" onClick={onClose}>Закрыть</button></div></footer>

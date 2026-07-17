@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { differenceInCalendarDays, format, parseISO, startOfToday } from "date-fns";
-import { Download, HardDrive, LayoutGrid, MoreHorizontal, Plus, Rows3, UsersRound } from "lucide-react";
-import { Toaster, toast } from "sonner";
+import { HardDrive, LayoutGrid, MoreHorizontal, Plus, Rows3, UsersRound } from "lucide-react";
+import { Toaster } from "sonner";
 import { ArchiveDialog } from "@/components/board/archive-dialog";
 import { BoardCanvas } from "@/components/board/board-canvas";
 import { BoardDialog } from "@/components/board/board-dialog";
@@ -115,18 +115,6 @@ export function DashboardApp({ initialSnapshot }: { initialSnapshot: WorkspaceSn
     return result.sort((a, b) => rank[a.kind] - rank[b.kind] || a.title.localeCompare(b.title, "ru")).slice(0, 30);
   }, [boards, currentUser.id, currentUser.name, lists, tasks]);
 
-  const exportWorkspace = () => {
-    const { boards, lists: allLists, tasks: allTasks, employees: allEmployees, activeBoardId: currentBoardId } = useBoardStore.getState();
-    const payload = JSON.stringify({ version: 3, exportedAt: new Date().toISOString(), activeBoardId: currentBoardId, boards, lists: allLists, tasks: allTasks, employees: allEmployees }, null, 2);
-    const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `flowboard-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.success("Резервная копия скачана");
-  };
-
   if (!mounted || !hydrated) return <div className="app-loading"><div className="loading-logo">F</div><div className="loading-line" /><span>Загружаем защищённое рабочее пространство…</span></div>;
 
   if (!board) return (
@@ -148,7 +136,6 @@ export function DashboardApp({ initialSnapshot }: { initialSnapshot: WorkspaceSn
             <div className="board-summary">
               <div className={`stat saved ${saveError ? "save-failed" : ""}`} title={saveError ?? undefined}><HardDrive size={16} /><span>{saveError ? "Ошибка сохранения" : saving ? "Сохраняем…" : "Сохранено"}</span></div>
               {currentUser.role !== "guest" && <button className="button secondary team-button" onClick={() => setTeamOpen(true)} aria-label={`Активные сотрудники: ${Object.values(employees).filter((employee) => employee.status === "active").length}`}><UsersRound size={15} /><span>{Object.values(employees).filter((employee) => employee.status === "active").length} {pluralize(Object.values(employees).filter((employee) => employee.status === "active").length, ["сотрудник", "сотрудника", "сотрудников"])}</span></button>}
-              {access.canEditWorkspace && <button className="button secondary invite-button" onClick={exportWorkspace}><Download size={15} />Экспорт</button>}
             </div>
           </section>
           <section className="view-toolbar">

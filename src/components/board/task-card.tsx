@@ -32,7 +32,6 @@ export function TaskCard({ task, listId, onOpen, overlay = false, canEdit, canEd
   const assignees = (task.assigneeIds ?? []).map((id) => employees[id]).filter(Boolean);
   const employeeList = Object.values(employees).filter((employee) => employee.status === "active").sort((a, b) => a.name.localeCompare(b.name, "ru"));
   const checklist = task.checklist ?? [];
-  const checklistDone = checklist.filter((item) => item.completed).length;
   const checklistOverdue = checklist.filter((item) => item.dueDate && !item.completed && isBefore(new Date(`${item.dueDate}T23:59:59`), startOfToday())).length;
 
   const finishTitleEdit = () => {
@@ -62,7 +61,7 @@ export function TaskCard({ task, listId, onOpen, overlay = false, canEdit, canEd
       {task.labels.length > 0 && <div className="label-row">{task.labels.slice(0, 3).map((label, index) => <span key={label} className={`label-color-${index % 4}`}>{label}</span>)}</div>}
       {task.closed && <span className="closed-badge"><CircleCheck size={12} />Закрыта</span>}
       {editingTitle ? <input className="card-title-input" autoFocus value={title} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()} onChange={(event) => setTitle(event.target.value)} onBlur={finishTitleEdit} onKeyDown={(event) => { event.stopPropagation(); if (event.key === "Enter") finishTitleEdit(); if (event.key === "Escape") { setTitle(task.title); setEditingTitle(false); } }} aria-label="Название задачи" /> : <h3 title={task.title}>{task.title}</h3>}
-      {checklist.length > 0 && <div className={cn("card-checklist-line", checklistDone === checklist.length && "complete", checklistOverdue > 0 && "has-overdue")}><CheckSquare2 size={13} /><span>{checklistDone}/{checklist.length}</span><i><b style={{ width: `${Math.round((checklistDone / checklist.length) * 100)}%` }} /></i>{checklistOverdue > 0 && <em title={`Просрочено пунктов: ${checklistOverdue}`}><AlertTriangle size={12} />{checklistOverdue}</em>}</div>}
+      {checklistOverdue > 0 && <div className="card-checklist-alert" title={`Просрочено пунктов: ${checklistOverdue}`}><AlertTriangle size={12} />{checklistOverdue}</div>}
       <div className="task-card-footer">
         <div className="card-assignee-picker" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
           <button type="button" className="card-assignee-trigger" disabled={!canEdit} onClick={() => setAssigneeOpen((open) => !open)} aria-label="Выбрать ответственных" aria-expanded={assigneeOpen}>

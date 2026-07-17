@@ -28,10 +28,10 @@ export function Modal({ open, onClose, title, description, children, size = "md"
 
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className={cn("modal-panel", size === "sm" && "modal-sm", size === "lg" && "modal-lg")} role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <header className="modal-header">
+      <section className={cn("modal-panel", size === "sm" && "modal-sm", size === "lg" && "modal-lg")} role="dialog" aria-modal="true" aria-labelledby={title ? "modal-title" : undefined} aria-label={title ? undefined : "Окно задачи"}>
+        <header className={cn("modal-header", !title && "titleless")}>
           <div>
-            <h2 id="modal-title">{title}</h2>
+            {title && <h2 id="modal-title">{title}</h2>}
             {description && <p>{description}</p>}
           </div>
           <button className="icon-button" onClick={onClose} aria-label="Закрыть окно"><X size={18} /></button>
