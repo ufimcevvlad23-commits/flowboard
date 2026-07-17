@@ -58,10 +58,9 @@ export function TaskCard({ task, listId, onOpen, overlay = false, canEdit, canEd
       {canEdit && <div className="card-quick-actions">
         <button onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); setTitle(task.title); setEditingTitle(true); }} aria-label="Изменить название задачи"><Pencil size={13} /></button>
       </div>}
-      {task.labels.length > 0 && <div className="label-row">{task.labels.slice(0, 3).map((label, index) => <span key={label} className={`label-color-${index % 4}`}>{label}</span>)}</div>}
+      {(task.labels.length > 0 || checklistOverdue > 0) && <div className="label-row">{task.labels.slice(0, 3).map((label, index) => <span key={label} className={`label-color-${index % 4}`}>{label}</span>)}{checklistOverdue > 0 && <span className="card-checklist-alert" title={`Просрочено пунктов: ${checklistOverdue}`}><AlertTriangle size={12} />{checklistOverdue}</span>}</div>}
       {task.closed && <span className="closed-badge"><CircleCheck size={12} />Закрыта</span>}
       {editingTitle ? <input className="card-title-input" autoFocus value={title} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()} onChange={(event) => setTitle(event.target.value)} onBlur={finishTitleEdit} onKeyDown={(event) => { event.stopPropagation(); if (event.key === "Enter") finishTitleEdit(); if (event.key === "Escape") { setTitle(task.title); setEditingTitle(false); } }} aria-label="Название задачи" /> : <h3 title={task.title}>{task.title}</h3>}
-      {checklistOverdue > 0 && <div className="card-checklist-alert" title={`Просрочено пунктов: ${checklistOverdue}`}><AlertTriangle size={12} />{checklistOverdue}</div>}
       <div className="task-card-footer">
         <div className="card-assignee-picker" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
           <button type="button" className="card-assignee-trigger" disabled={!canEdit} onClick={() => setAssigneeOpen((open) => !open)} aria-label="Выбрать ответственных" aria-expanded={assigneeOpen}>
