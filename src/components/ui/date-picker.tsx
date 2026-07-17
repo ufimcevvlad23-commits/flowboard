@@ -12,11 +12,13 @@ interface DatePickerProps {
   onChange: (value?: string) => void;
   disabled?: boolean;
   disabledReason?: string;
+  compact?: boolean;
+  iconOnly?: boolean;
 }
 
 const weekDays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
-export function DatePicker({ value, onChange, disabled = false, disabledReason }: DatePickerProps) {
+export function DatePicker({ value, onChange, disabled = false, disabledReason, compact = false, iconOnly = false }: DatePickerProps) {
   const selectedDate = value ? parseISO(value) : undefined;
   const today = new Date();
   const [open, setOpen] = useState(false);
@@ -130,11 +132,11 @@ export function DatePicker({ value, onChange, disabled = false, disabledReason }
   ) : null;
 
   return (
-    <div className="date-picker" ref={rootRef}>
-      <button ref={triggerRef} type="button" className={cn("date-picker-trigger", open && "open", !value && "placeholder")} onClick={() => { setVisibleMonth(startOfMonth(selectedDate ?? today)); setPosition((current) => ({ ...current, visibility: "hidden" })); setOpen((current) => !current); }} aria-haspopup="dialog" aria-expanded={open} disabled={disabled} title={disabled ? disabledReason : undefined}>
+    <div className={cn("date-picker", compact && "compact", iconOnly && "icon-only")} ref={rootRef}>
+      <button ref={triggerRef} type="button" className={cn("date-picker-trigger", open && "open", !value && "placeholder")} onClick={() => { setVisibleMonth(startOfMonth(selectedDate ?? today)); setPosition((current) => ({ ...current, visibility: "hidden" })); setOpen((current) => !current); }} aria-haspopup="dialog" aria-expanded={open} disabled={disabled} title={disabled ? disabledReason : iconOnly ? selectedDate ? `Дедлайн: ${format(selectedDate, "dd.MM.yyyy")}` : "Назначить дедлайн" : undefined}>
         <CalendarDays size={16} />
-        <span>{selectedDate ? format(selectedDate, "dd.MM.yyyy") : "Выберите дату"}</span>
-        <ChevronDown size={15} />
+        {!iconOnly && <span>{selectedDate ? format(selectedDate, compact ? "dd.MM" : "dd.MM.yyyy") : compact ? "Срок" : "Выберите дату"}</span>}
+        {!iconOnly && <ChevronDown size={15} />}
       </button>
       {popover}
     </div>

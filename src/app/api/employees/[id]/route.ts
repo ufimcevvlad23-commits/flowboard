@@ -21,7 +21,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     UPDATE employees
     SET status = 'deleted', deleted_at = NOW(), password_hash = NULL, password_salt = NULL, failed_attempts = 0, locked_until = NULL
     WHERE id = ${id}
-    RETURNING id, name, login, email, status, role, can_edit_deadlines, created_at, deleted_at
+    RETURNING id, name, login, email, status, role, can_edit_deadlines, board_ids, created_at, deleted_at
   ` as EmployeeRow[];
   await revokeEmployeeSessions(id);
   return noStoreJson({ employee: employeeDto(rows[0]) });
@@ -34,18 +34,18 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (user.role !== "admin") return noStoreJson({ error: "Недостаточно прав" }, { status: 403 });
   const { id } = await context.params;
 
-  let body: { name?: unknown; login?: unknown; email?: unknown; role?: unknown; canEditDeadlines?: unknown };
+  let body: { name?: unknown; login?: unknown; email?: unknown; role?: unknown; canEditDeadlines?: unknown; boardIds?: unknown };
   try { body = await request.json(); } catch { return noStoreJson({ error: "Некорректный запрос" }, { status: 400 }); }
   const sql = getSql();
   const currentRows = await sql`
-    SELECT id, name, login, email, status, role, can_edit_deadlines, created_at, deleted_at
+    SELECT id, name, login, email, status, role, can_edit_deadlines, board_ids, created_at, deleted_at
     FROM employees WHERE id = ${id} AND status = 'active' LIMIT 1
   ` as EmployeeRow[];
   const current = currentRows[0];
   if (!current) return noStoreJson({ error: "Активный сотрудник не найден" }, { status: 404 });
 
   const hasProfileChanges = Object.hasOwn(body, "name") || Object.hasOwn(body, "login") || Object.hasOwn(body, "email");
-  const hasAccessChanges = Object.hasOwn(body, "role") || Object.hasOwn(body, "canEditDeadlines");
+  const hasAccessChanges = Object.hasOwn(body, "role") || Object.hasOwn(body, "canEditDeadlines") || Object.hasOwn(body, "boardIds");
   if (!hasProfileChanges && !hasAccessChanges) return noStoreJson({ error: "Нет изменений для сохранения" }, { status: 400 });
   if (hasAccessChanges && id === user.id) return noStoreJson({ error: "Собственные права администратора изменить нельзя" }, { status: 400 });
 
@@ -63,13 +63,20 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return noStoreJson({ error: "Выберите корректную роль" }, { status: 400 });
   }
   const canEditDeadlines = role === "admin" ? true : role === "guest" ? false : Object.hasOwn(body, "canEditDeadlines") ? body.canEditDeadlines === true : current.can_edit_deadlines;
+  const boardIds = Object.hasOwn(body, "boardIds")
+    ? Array.isArray(body.boardIds) && body.boardIds.every((boardId) => typeof boardId === "string" && boardId.length <= 120) ? [...new Set(body.boardIds)] : null
+    : Array.isArray(current.board_ids) ? current.board_ids.filter((boardId): boardId is string => typeof boardId === "string") : [];
+  if (!boardIds) return noStoreJson({ error: "Некорректный список досок" }, { status: 400 });
+  const workspaceRows = await sql`SELECT data->'boards' AS boards FROM workspaces WHERE id = 'main' LIMIT 1` as Array<{ boards: Record<string, unknown> }>;
+  const existingBoardIds = new Set(Object.keys(workspaceRows[0]?.boards ?? {}));
+  if (boardIds.some((boardId) => !existingBoardIds.has(boardId))) return noStoreJson({ error: "Одна из выбранных досок не существует" }, { status: 400 });
 
   try {
     const rows = await sql`
       UPDATE employees
-      SET name = ${name}, login = ${login}, email = ${email || null}, role = ${role}, can_edit_deadlines = ${canEditDeadlines}
+      SET name = ${name}, login = ${login}, email = ${email || null}, role = ${role}, can_edit_deadlines = ${canEditDeadlines}, board_ids = ${JSON.stringify(boardIds)}::jsonb
       WHERE id = ${id} AND status = 'active'
-      RETURNING id, name, login, email, status, role, can_edit_deadlines, created_at, deleted_at
+      RETURNING id, name, login, email, status, role, can_edit_deadlines, board_ids, created_at, deleted_at
     ` as EmployeeRow[];
     return noStoreJson({ employee: employeeDto(rows[0]) });
   } catch (error) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarClock, Check, Eye, KeyRound, Mail, Pencil, ShieldCheck, Trash2, UserCog, UserPlus, UsersRound, X } from "lucide-react";
+import { CalendarClock, Check, Eye, KeyRound, LayoutDashboard, Mail, Pencil, ShieldCheck, Trash2, UserCog, UserPlus, UsersRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import { SelectMenu } from "@/components/ui/select-menu";
@@ -25,6 +25,7 @@ const roleDescriptions: Record<EmployeeRole, string> = {
 
 export function TeamDialog({ open, onClose, canManage, currentUserId }: TeamDialogProps) {
   const employees = useBoardStore((state) => state.employees);
+  const boards = useBoardStore((state) => state.boards);
   const upsertEmployee = useBoardStore((state) => state.upsertEmployee);
   const [tab, setTab] = useState<"employees" | "access">("employees");
   const [name, setName] = useState("");
@@ -32,6 +33,7 @@ export function TeamDialog({ open, onClose, canManage, currentUserId }: TeamDial
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<EmployeeRole>("member");
   const [canEditDeadlines, setCanEditDeadlines] = useState(true);
+  const [boardIds, setBoardIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [savingAccessId, setSavingAccessId] = useState<string | null>(null);
@@ -41,6 +43,7 @@ export function TeamDialog({ open, onClose, canManage, currentUserId }: TeamDial
   const [savingEmployeeId, setSavingEmployeeId] = useState<string | null>(null);
   const employeeList = Object.values(employees).sort((a, b) => a.status === b.status ? a.name.localeCompare(b.name, "ru") : a.status === "active" ? -1 : 1);
   const activeEmployees = employeeList.filter((employee) => employee.status === "active");
+  const boardList = Object.values(boards).sort((a, b) => a.title.localeCompare(b.title, "ru"));
 
   const submit = async () => {
     if (!name.trim()) { toast.error("Введите имя сотрудника"); return; }
@@ -52,12 +55,12 @@ export function TeamDialog({ open, onClose, canManage, currentUserId }: TeamDial
       const response = await fetch("/api/employees", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), login, email: login.includes("@") ? login : "", password, role, canEditDeadlines }),
+        body: JSON.stringify({ name: name.trim(), login, email: login.includes("@") ? login : "", password, role, canEditDeadlines, boardIds }),
       });
       const result = await response.json() as { employee?: Employee; error?: string };
       if (!response.ok || !result.employee) throw new Error(result.error || "Не удалось добавить сотрудника");
       upsertEmployee(result.employee);
-      setName(""); setIdentity(""); setPassword(""); setRole("member"); setCanEditDeadlines(true);
+      setName(""); setIdentity(""); setPassword(""); setRole("member"); setCanEditDeadlines(true); setBoardIds([]);
       toast.success("Сотрудник добавлен с выбранными правами");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Не удалось добавить сотрудника");
@@ -82,13 +85,13 @@ export function TeamDialog({ open, onClose, canManage, currentUserId }: TeamDial
     }
   };
 
-  const updateAccess = async (employee: Employee, nextRole: EmployeeRole, deadlineAccess: boolean) => {
+  const updateAccess = async (employee: Employee, nextRole: EmployeeRole, deadlineAccess: boolean, nextBoardIds = employee.boardIds) => {
     setSavingAccessId(employee.id);
     try {
       const response = await fetch(`/api/employees/${encodeURIComponent(employee.id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: nextRole, canEditDeadlines: deadlineAccess }),
+        body: JSON.stringify({ role: nextRole, canEditDeadlines: deadlineAccess, boardIds: nextBoardIds }),
       });
       const result = await response.json() as { employee?: Employee; error?: string };
       if (!response.ok || !result.employee) throw new Error(result.error || "Не удалось обновить права");
@@ -144,6 +147,7 @@ export function TeamDialog({ open, onClose, canManage, currentUserId }: TeamDial
             <label className="field"><span>Временный пароль</span><div className="password-field"><KeyRound size={14} /><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void submit()} placeholder="Минимум 10 символов" autoComplete="new-password" /></div></label>
             <div className="field"><span>Уровень доступа</span><SelectMenu value={role} ariaLabel="Уровень доступа" options={(Object.keys(roleLabels) as EmployeeRole[]).map((value) => ({ value, label: roleLabels[value], description: roleDescriptions[value] }))} onChange={(value) => { const nextRole = value as EmployeeRole; setRole(nextRole); setCanEditDeadlines(nextRole !== "guest"); }} /><small className="field-help">{roleDescriptions[role]}</small></div>
             {role === "member" && <label className="permission-toggle"><input type="checkbox" checked={canEditDeadlines} onChange={(event) => setCanEditDeadlines(event.target.checked)} /><span><CalendarClock size={15} /><b>Изменение дедлайнов</b><small>Разрешить менять сроки задач и пунктов чек-листа</small></span></label>}
+            {role !== "admin" && <div className="field board-access-field"><span><LayoutDashboard size={13} />Доступ к доскам</span><div className="board-access-grid">{boardList.map((board) => <label key={board.id} className={boardIds.includes(board.id) ? "selected" : ""}><input type="checkbox" checked={boardIds.includes(board.id)} onChange={() => setBoardIds((current) => current.includes(board.id) ? current.filter((id) => id !== board.id) : [...current, board.id])} /><i style={{ background: board.color }} /><span>{board.title}</span></label>)}</div></div>}
             <button className="button primary" onClick={() => void submit()} disabled={submitting}><UserPlus size={15} />{submitting ? "Добавляем…" : "Добавить сотрудника"}</button>
           </div> : <div className="team-readonly-note"><ShieldCheck size={16} /><span>Создавать, удалять сотрудников и выдавать права может только администратор.</span></div>}
           <div className="employee-section-title"><UsersRound size={15} /><span>Команда</span><b>{activeEmployees.length}</b></div>
@@ -176,6 +180,7 @@ export function TeamDialog({ open, onClose, canManage, currentUserId }: TeamDial
                 <div className="access-identity"><span className="employee-avatar" style={{ background: employeeColor(employee.id) }}>{employeeInitials(employee.name)}</span><div><strong>{employee.name}</strong><small>{locked ? "Текущий администратор" : employee.email || employee.login}</small></div></div>
                 <div className="access-role"><span>Роль</span><SelectMenu compact value={employee.role} disabled={locked || saving} ariaLabel={`Роль сотрудника ${employee.name}`} options={(Object.keys(roleLabels) as EmployeeRole[]).map((value) => ({ value, label: roleLabels[value] }))} onChange={(value) => { const nextRole = value as EmployeeRole; void updateAccess(employee, nextRole, nextRole === "admin" ? true : nextRole === "guest" ? false : employee.canEditDeadlines); }} /></div>
                 <label className={cn("permission-toggle compact-permission", employee.role !== "member" && "forced")}><input type="checkbox" checked={employee.role === "admin" || (employee.role === "member" && employee.canEditDeadlines)} disabled={locked || saving || employee.role !== "member"} onChange={(event) => void updateAccess(employee, employee.role, event.target.checked)} /><span><CalendarClock size={14} /><b>Изменение дедлайнов</b><small>{employee.role === "admin" ? "Всегда разрешено администратору" : employee.role === "guest" ? "Недоступно гостю" : employee.canEditDeadlines ? "Разрешено" : "Запрещено"}</small></span></label>
+                <div className="access-boards"><span><LayoutDashboard size={13} />Доски</span>{employee.role === "admin" ? <small>Все доски</small> : <div className="board-access-grid compact">{boardList.map((board) => { const checked = employee.boardIds.includes(board.id); return <label key={board.id} className={checked ? "selected" : ""}><input type="checkbox" checked={checked} disabled={locked || saving} onChange={() => void updateAccess(employee, employee.role, employee.canEditDeadlines, checked ? employee.boardIds.filter((id) => id !== board.id) : [...employee.boardIds, board.id])} /><i style={{ background: board.color }} /><span>{board.title}</span></label>; })}</div>}</div>
                 <div className="access-summary">{employee.role === "guest" ? <Eye size={14} /> : <ShieldCheck size={14} />}<span>{roleDescriptions[employee.role]}</span></div>
               </div>;
             })}

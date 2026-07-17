@@ -17,9 +17,10 @@ interface ListColumnProps {
   tasks: Task[];
   onOpenTask: (id: string) => void;
   canEdit: boolean;
+  canEditDeadlines: boolean;
 }
 
-export function ListColumn({ listId, boardId, tasks, onOpenTask, canEdit }: ListColumnProps) {
+export function ListColumn({ listId, boardId, tasks, onOpenTask, canEdit, canEditDeadlines }: ListColumnProps) {
   const list = useBoardStore((state) => state.lists[listId]);
   const createTask = useBoardStore((state) => state.createTask);
   const updateList = useBoardStore((state) => state.updateList);
@@ -71,7 +72,7 @@ export function ListColumn({ listId, boardId, tasks, onOpenTask, canEdit }: List
       </header>
       <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
         <div className="task-stack">
-          {tasks.map((task) => <TaskCard key={task.id} task={task} listId={listId} onOpen={onOpenTask} canEdit={canEdit} />)}
+          {tasks.map((task) => <TaskCard key={task.id} task={task} listId={listId} onOpen={onOpenTask} canEdit={canEdit} canEditDeadlines={canEditDeadlines} />)}
           {tasks.length === 0 && !adding && (canEdit ? <button className="empty-list" onClick={() => setAdding(true)}><span>Здесь пока пусто</span><small>Добавьте первую задачу</small></button> : <div className="empty-list readonly"><span>Здесь пока пусто</span></div>)}
         </div>
       </SortableContext>

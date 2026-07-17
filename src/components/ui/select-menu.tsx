@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,9 +19,12 @@ interface SelectMenuProps {
   disabled?: boolean;
   className?: string;
   compact?: boolean;
+  icon?: ReactNode;
+  iconOnly?: boolean;
+  title?: string;
 }
 
-export function SelectMenu({ value, options, onChange, ariaLabel, disabled = false, className, compact = false }: SelectMenuProps) {
+export function SelectMenu({ value, options, onChange, ariaLabel, disabled = false, className, compact = false, icon, iconOnly = false, title }: SelectMenuProps) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ top: 12, left: 12, width: 220, maxHeight: 280, visibility: "hidden" as "hidden" | "visible" });
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -98,9 +101,9 @@ export function SelectMenu({ value, options, onChange, ariaLabel, disabled = fal
     document.body,
   ) : null;
 
-  return <div className={cn("select-menu", compact && "compact", className)}>
-    <button ref={triggerRef} type="button" className={cn("select-menu-trigger", open && "open")} onClick={() => { setPosition((current) => ({ ...current, visibility: "hidden" })); setOpen((current) => !current); }} disabled={disabled} aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={open}>
-      <span>{selected?.label ?? "Выберите"}</span><ChevronDown size={15} />
+  return <div className={cn("select-menu", compact && "compact", iconOnly && "icon-only", className)}>
+    <button ref={triggerRef} type="button" className={cn("select-menu-trigger", open && "open")} onClick={() => { setPosition((current) => ({ ...current, visibility: "hidden" })); setOpen((current) => !current); }} disabled={disabled} aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={open} title={title}>
+      {icon}{!iconOnly && <span>{selected?.label ?? "Выберите"}</span>}{!iconOnly && <ChevronDown size={15} />}
     </button>
     {popover}
   </div>;

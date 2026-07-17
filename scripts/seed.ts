@@ -24,8 +24,8 @@ for (const employee of Object.values(seedData.employees)) {
   const salt = randomBytes(16).toString("base64url");
   const passwordHash = (await scrypt(password, salt, 64) as Buffer).toString("base64url");
   await sql`
-    INSERT INTO employees (id, name, login, email, password_hash, password_salt, role, can_edit_deadlines, status, created_at)
-    VALUES (${employee.id}, ${employee.name}, ${employee.login}, ${employee.email ?? null}, ${passwordHash}, ${salt}, ${employee.role}, ${employee.canEditDeadlines}, ${employee.status}, ${employee.createdAt})
+    INSERT INTO employees (id, name, login, email, password_hash, password_salt, role, can_edit_deadlines, board_ids, status, created_at)
+    VALUES (${employee.id}, ${employee.name}, ${employee.login}, ${employee.email ?? null}, ${passwordHash}, ${salt}, ${employee.role}, ${employee.canEditDeadlines}, ${JSON.stringify(employee.boardIds)}::jsonb, ${employee.status}, ${employee.createdAt})
   `;
   credentials.push({ name: employee.name, login: employee.login, password, role: employee.role });
 }

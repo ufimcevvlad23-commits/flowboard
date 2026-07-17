@@ -12,6 +12,7 @@ export function getAccess(user: Pick<SessionUser, "role" | "canEditDeadlines">) 
   return {
     isAdmin,
     canManageEmployees: isAdmin,
+    canManageBoards: isAdmin,
     canEditWorkspace,
     canEditDeadlines: isAdmin || (canEditWorkspace && user.canEditDeadlines),
   };

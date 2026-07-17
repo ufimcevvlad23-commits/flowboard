@@ -4,7 +4,7 @@ import { arrayMove } from "@dnd-kit/sortable";
 import { create } from "zustand";
 import { seedData } from "@/lib/seed";
 import { uid } from "@/lib/utils";
-import type { Board, Comment, Employee, List, Task, TaskDraft, WorkspaceData, WorkspaceSnapshot } from "@/types/board";
+import type { Board, Comment, CommentAttachment, Employee, List, Task, TaskDraft, WorkspaceData, WorkspaceSnapshot } from "@/types/board";
 
 interface BoardState extends WorkspaceData {
   hydrated: boolean;
@@ -23,12 +23,12 @@ interface BoardState extends WorkspaceData {
   reorderLists: (boardId: string, activeId: string, overId: string) => void;
   upsertEmployee: (employee: Employee) => void;
   createTask: (listId: string, title: string) => string;
-  updateTask: (id: string, updates: Partial<TaskDraft & Pick<Task, "pinned" | "closed" | "archived">>) => void;
+  updateTask: (id: string, updates: Partial<TaskDraft & Pick<Task, "closed" | "archived">>) => void;
   toggleTaskClosed: (taskId: string) => void;
   deleteTask: (taskId: string) => void;
   moveTask: (taskId: string, fromListId: string, toListId: string, overTaskId?: string) => void;
   reorderTask: (listId: string, activeId: string, overId: string) => void;
-  addComment: (taskId: string, text: string, author?: string) => void;
+  addComment: (taskId: string, text: string, author?: string, mentionIds?: string[], attachments?: CommentAttachment[]) => void;
   restoreTask: (taskId: string) => void;
   resetWorkspace: () => void;
 }
@@ -142,7 +142,7 @@ export const useBoardStore = create<BoardState>((set, get) => {
     upsertEmployee: (employee) => set((state) => ({ employees: { ...state.employees, [employee.id]: employee } })),
     createTask: (listId, title) => {
       const id = uid("task");
-      const task: Task = { id, title, checklist: [], priority: "medium", status: "backlog", labels: [], assigneeIds: [], comments: [], notes: "", pinned: false, closed: false, archived: false, createdAt: new Date().toISOString() };
+      const task: Task = { id, title, checklist: [], priority: "medium", status: "backlog", labels: [], assigneeIds: [], comments: [], closed: false, archived: false, createdAt: new Date().toISOString() };
       mutate((state) => ({ tasks: { ...state.tasks, [id]: task }, lists: { ...state.lists, [listId]: { ...state.lists[listId], taskIds: [...state.lists[listId].taskIds, id] } } }));
       return id;
     },
@@ -178,8 +178,8 @@ export const useBoardStore = create<BoardState>((set, get) => {
       const ids = state.lists[listId].taskIds;
       return { lists: { ...state.lists, [listId]: { ...state.lists[listId], taskIds: activeBeforeClosed(arrayMove(ids, ids.indexOf(activeId), ids.indexOf(overId)), state.tasks) } } };
     }),
-    addComment: (taskId, text, author = "Вы") => {
-      const comment: Comment = { id: uid("comment"), author, text, createdAt: new Date().toISOString() };
+    addComment: (taskId, text, author = "Вы", mentionIds = [], attachments = []) => {
+      const comment: Comment = { id: uid("comment"), author, text, createdAt: new Date().toISOString(), mentionIds: [...new Set(mentionIds)], attachments };
       mutate((state) => ({ tasks: { ...state.tasks, [taskId]: { ...state.tasks[taskId], comments: [...state.tasks[taskId].comments, comment] } } }));
     },
     restoreTask: (taskId) => mutate((state) => ({ tasks: { ...state.tasks, [taskId]: { ...state.tasks[taskId], archived: false } } })),

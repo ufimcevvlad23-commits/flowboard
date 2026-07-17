@@ -8,13 +8,14 @@ import type { SessionUser } from "@/types/board";
 interface SidebarProps {
   currentUser: SessionUser;
   canEdit: boolean;
+  canManageBoards: boolean;
   collapsed: boolean;
   onToggle: () => void;
   onCreateBoard: () => void;
   onManageBoard: (id: string) => void;
   onOpenArchive: () => void;
 }
-export function Sidebar({ currentUser, canEdit, collapsed, onToggle, onCreateBoard, onManageBoard, onOpenArchive }: SidebarProps) {
+export function Sidebar({ currentUser, canEdit, canManageBoards, collapsed, onToggle, onCreateBoard, onManageBoard, onOpenArchive }: SidebarProps) {
   const boards = useBoardStore((state) => state.boards);
   const activeBoardId = useBoardStore((state) => state.activeBoardId);
   const setActiveBoard = useBoardStore((state) => state.setActiveBoard);
@@ -36,7 +37,7 @@ export function Sidebar({ currentUser, canEdit, collapsed, onToggle, onCreateBoa
       </nav>
 
       <div className="sidebar-section">
-        {!collapsed && <div className="section-heading"><span>Рабочее пространство</span>{canEdit && <button className="icon-button" onClick={onCreateBoard} aria-label="Создать доску"><Plus size={15} /></button>}</div>}
+        {!collapsed && <div className="section-heading"><span>Рабочее пространство</span>{canManageBoards && <button className="icon-button" onClick={onCreateBoard} aria-label="Создать доску"><Plus size={15} /></button>}</div>}
         <div className="board-nav-list">
           {Object.values(boards).map((board) => (
             <div className={cn("board-nav-row", activeBoardId === board.id && "selected")} key={board.id}>
@@ -44,10 +45,10 @@ export function Sidebar({ currentUser, canEdit, collapsed, onToggle, onCreateBoa
                 <span className="board-dot" style={{ background: board.color }} />
                 <span>{board.title}</span>
               </button>
-              {!collapsed && canEdit && <button className="board-settings" onClick={() => onManageBoard(board.id)} aria-label={`Настроить доску ${board.title}`}><Settings2 size={14} /></button>}
+              {!collapsed && canManageBoards && <button className="board-settings" onClick={() => onManageBoard(board.id)} aria-label={`Настроить доску ${board.title}`}><Settings2 size={14} /></button>}
             </div>
           ))}
-          {collapsed && canEdit && <button className="add-collapsed" onClick={onCreateBoard} aria-label="Создать доску"><Plus size={17} /></button>}
+          {collapsed && canManageBoards && <button className="add-collapsed" onClick={onCreateBoard} aria-label="Создать доску"><Plus size={17} /></button>}
         </div>
       </div>
 

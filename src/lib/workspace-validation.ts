@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { ChecklistItem, Task, WorkspaceData } from "@/types/board";
+import type { ChecklistItem, CommentAttachment, Task, WorkspaceData } from "@/types/board";
 
 function record(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -22,6 +22,19 @@ function checklistItem(value: unknown): ChecklistItem | null {
   const createdAt = text(value.createdAt, 64);
   if (!id || !title || dueDate === null || !createdAt || typeof value.completed !== "boolean") return null;
   return { id, title, completed: value.completed, dueDate, createdAt };
+}
+
+function commentAttachment(value: unknown): CommentAttachment | null {
+  if (!record(value)) return null;
+  const id = text(value.id, 120);
+  const name = text(value.name, 180)?.trim();
+  const type = value.type;
+  const dataUrl = text(value.dataUrl, 3_000_000);
+  const size = typeof value.size === "number" && Number.isInteger(value.size) ? value.size : -1;
+  if (!id || !name || (type !== "image/png" && type !== "image/jpeg" && type !== "image/webp") || !dataUrl || size < 0 || size > 2_000_000) return null;
+  const expectedPrefix = `data:${type};base64,`;
+  if (!dataUrl.startsWith(expectedPrefix) || !/^[A-Za-z0-9+/=]+$/.test(dataUrl.slice(expectedPrefix.length))) return null;
+  return { id, name, type, dataUrl, size };
 }
 
 export function sanitizeWorkspacePayload(value: unknown): Omit<WorkspaceData, "employees"> | null {
@@ -51,23 +64,25 @@ export function sanitizeWorkspacePayload(value: unknown): Omit<WorkspaceData, "e
   const tasks: WorkspaceData["tasks"] = {};
   for (const [id, raw] of Object.entries(value.tasks)) {
     if (!record(raw) || id.length > 120) return null;
-    const title = text(raw.title, 300)?.trim();
+    const title = text(raw.title, 5000)?.trim();
     const dueDate = optionalDate(raw.dueDate);
     const createdAt = text(raw.createdAt, 64);
-    const notes = text(raw.notes, 5000) ?? "";
     if (!title || dueDate === null || !createdAt || !Array.isArray(raw.checklist) || raw.checklist.length > 200 || !Array.isArray(raw.labels) || !Array.isArray(raw.assigneeIds) || !Array.isArray(raw.comments)) return null;
     const normalizedChecklist = raw.checklist.map(checklistItem);
     if (normalizedChecklist.some((item) => !item)) return null;
     if (raw.labels.some((item) => typeof item !== "string" || item.length > 80) || raw.assigneeIds.some((item) => typeof item !== "string" || item.length > 120)) return null;
     if (!["low", "medium", "high", "urgent"].includes(String(raw.priority)) || !["backlog", "in-progress", "review", "done"].includes(String(raw.status))) return null;
-    if ([raw.pinned, raw.closed, raw.archived].some((item) => typeof item !== "boolean")) return null;
+    if ([raw.closed, raw.archived].some((item) => typeof item !== "boolean")) return null;
     const comments = raw.comments.flatMap((comment) => {
       if (!record(comment)) return [];
       const commentId = text(comment.id, 120);
       const author = text(comment.author, 120)?.trim();
       const commentText = text(comment.text, 3000)?.trim();
       const commentCreatedAt = text(comment.createdAt, 64);
-      return commentId && author && commentText && commentCreatedAt ? [{ id: commentId, author, text: commentText, createdAt: commentCreatedAt }] : [];
+      const mentionIds = Array.isArray(comment.mentionIds) && comment.mentionIds.every((item) => typeof item === "string" && item.length <= 120) ? [...new Set(comment.mentionIds)] : [];
+      const attachments = Array.isArray(comment.attachments) && comment.attachments.length <= 4 ? comment.attachments.map(commentAttachment) : [];
+      if (attachments.some((item) => !item)) return [];
+      return commentId && author && (commentText || attachments.length > 0) && commentCreatedAt ? [{ id: commentId, author, text: commentText ?? "", createdAt: commentCreatedAt, mentionIds, attachments: attachments as CommentAttachment[] }] : [];
     });
     tasks[id] = {
       id,
@@ -79,8 +94,6 @@ export function sanitizeWorkspacePayload(value: unknown): Omit<WorkspaceData, "e
       labels: raw.labels,
       assigneeIds: raw.assigneeIds,
       comments,
-      notes,
-      pinned: raw.pinned as boolean,
       closed: raw.closed as boolean,
       archived: raw.archived as boolean,
       createdAt,

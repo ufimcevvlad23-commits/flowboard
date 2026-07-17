@@ -18,9 +18,10 @@ interface BoardCanvasProps {
   onOpenTask: (id: string) => void;
   sort: TaskSort;
   canEdit: boolean;
+  canEditDeadlines: boolean;
 }
 
-export function BoardCanvas({ boardId, search, filters, onOpenTask, sort, canEdit }: BoardCanvasProps) {
+export function BoardCanvas({ boardId, search, filters, onOpenTask, sort, canEdit, canEditDeadlines }: BoardCanvasProps) {
   const board = useBoardStore((state) => state.boards[boardId]);
   const lists = useBoardStore((state) => state.lists);
   const tasks = useBoardStore((state) => state.tasks);
@@ -73,12 +74,12 @@ export function BoardCanvas({ boardId, search, filters, onOpenTask, sort, canEdi
         {totalVisible === 0 && !matchingEmptyList && hasActiveFilter && <div className="no-results"><SearchX size={24} /><div><strong>Ничего не найдено</strong><span>Измените запрос или сбросьте фильтры</span></div></div>}
         <SortableContext items={visibleLists.map((list) => list.id)} strategy={horizontalListSortingStrategy}>
           <div className="board-columns">
-            {visibleLists.map((list) => <ListColumn key={list.id} listId={list.id} boardId={boardId} tasks={sortTasks(list.taskIds.map((id) => tasks[id]).filter((task): task is Task => Boolean(task) && taskMatches(task, search, filters, list.title)), sort)} onOpenTask={onOpenTask} canEdit={canEdit} />)}
+            {visibleLists.map((list) => <ListColumn key={list.id} listId={list.id} boardId={boardId} tasks={sortTasks(list.taskIds.map((id) => tasks[id]).filter((task): task is Task => Boolean(task) && taskMatches(task, search, filters, list.title)), sort)} onOpenTask={onOpenTask} canEdit={canEdit} canEditDeadlines={canEditDeadlines} />)}
             {canEdit && (addingList ? <div className="new-list-form"><input autoFocus value={listTitle} onChange={(event) => setListTitle(event.target.value)} onKeyDown={(event) => event.key === "Enter" && submitList()} placeholder="Название списка" /><div><button className="button primary compact" onClick={submitList}>Создать</button><button className="button ghost compact" onClick={() => setAddingList(false)}>Отмена</button></div></div> : <button className="add-list-button" onClick={() => setAddingList(true)}><Plus size={18} />Добавить список</button>)}
           </div>
         </SortableContext>
       </div>
-      <DragOverlay>{activeTask ? <TaskCard task={activeTask} listId="overlay" onOpen={() => undefined} overlay canEdit={canEdit} /> : null}</DragOverlay>
+      <DragOverlay>{activeTask ? <TaskCard task={activeTask} listId="overlay" onOpen={() => undefined} overlay canEdit={canEdit} canEditDeadlines={canEditDeadlines} /> : null}</DragOverlay>
     </DndContext>
   );
 }

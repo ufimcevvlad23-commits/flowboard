@@ -61,14 +61,14 @@ export function DashboardApp({ initialSnapshot }: { initialSnapshot: WorkspaceSn
       if (response.status === 401) window.location.assign("/login");
       if (response.ok) {
         const result = await response.json() as { user?: SessionUser };
-        if (result.user && (result.user.role !== currentUser.role || result.user.canEditDeadlines !== currentUser.canEditDeadlines)) window.location.reload();
+        if (result.user && (result.user.role !== currentUser.role || result.user.canEditDeadlines !== currentUser.canEditDeadlines || result.user.boardIds.join("|") !== currentUser.boardIds.join("|"))) window.location.reload();
       }
     };
     const interval = window.setInterval(() => void verify(), 10_000);
     const onVisibility = () => document.visibilityState === "visible" && void verify();
     document.addEventListener("visibilitychange", onVisibility);
     return () => { window.clearInterval(interval); document.removeEventListener("visibilitychange", onVisibility); };
-  }, [currentUser.canEditDeadlines, currentUser.role]);
+  }, [currentUser.boardIds, currentUser.canEditDeadlines, currentUser.role]);
 
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
@@ -109,11 +109,11 @@ export function DashboardApp({ initialSnapshot }: { initialSnapshot: WorkspaceSn
         else if (days <= 3) result.push({ id: `check-soon-${task.id}-${item.id}`, kind: "soon", title: `Срок пункта: ${item.title}`, detail: days === 0 ? `Сегодня · ${task.title}` : `Через ${days} дн. · ${task.title}`, taskId: task.id, boardId });
       });
       const mention = `@${currentUser.name}`.toLocaleLowerCase("ru");
-      task.comments.filter((comment) => comment.author !== currentUser.name && comment.text.toLocaleLowerCase("ru").includes(mention)).forEach((comment) => result.push({ id: `mention-${task.id}-${comment.id}`, kind: "mention", title: `${comment.author} упомянул(а) вас`, detail: `В задаче «${task.title}»`, taskId: task.id, boardId }));
+      task.comments.filter((comment) => comment.author !== currentUser.name && ((comment.mentionIds ?? []).includes(currentUser.id) || comment.text.toLocaleLowerCase("ru").includes(mention))).forEach((comment) => result.push({ id: `mention-${task.id}-${comment.id}`, kind: "mention", title: `${comment.author} упомянул(а) вас`, detail: `В задаче «${task.title}»`, taskId: task.id, boardId }));
     });
     const rank = { overdue: 0, mention: 1, soon: 2 } as const;
     return result.sort((a, b) => rank[a.kind] - rank[b.kind] || a.title.localeCompare(b.title, "ru")).slice(0, 30);
-  }, [boards, currentUser.name, lists, tasks]);
+  }, [boards, currentUser.id, currentUser.name, lists, tasks]);
 
   const exportWorkspace = () => {
     const { boards, lists: allLists, tasks: allTasks, employees: allEmployees, activeBoardId: currentBoardId } = useBoardStore.getState();
@@ -135,7 +135,7 @@ export function DashboardApp({ initialSnapshot }: { initialSnapshot: WorkspaceSn
 
   return (
     <div className={`app-shell ${sidebarCollapsed ? "sidebar-is-collapsed" : ""} ${compact ? "compact-mode" : ""} ${mobileOpen ? "mobile-sidebar-open" : ""}`}>
-      <Sidebar currentUser={currentUser} canEdit={access.canEditWorkspace} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateBoard={() => { setManagedBoardId(null); setBoardDialogOpen(true); }} onManageBoard={(id) => { setManagedBoardId(id); setBoardDialogOpen(true); }} onOpenArchive={() => setArchiveOpen(true)} />
+      <Sidebar currentUser={currentUser} canEdit={access.canEditWorkspace} canManageBoards={access.canManageBoards} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateBoard={() => { setManagedBoardId(null); setBoardDialogOpen(true); }} onManageBoard={(id) => { setManagedBoardId(id); setBoardDialogOpen(true); }} onOpenArchive={() => setArchiveOpen(true)} />
       {mobileOpen && <button className="mobile-overlay" onClick={() => setMobileOpen(false)} aria-label="Закрыть меню" />}
       <div className="workspace">
         <Topbar currentUser={currentUser} search={search} onSearch={setSearch} filters={filters} onFilters={setFilters} filterOpen={filterOpen} onFilterOpen={setFilterOpen} dark={dark} onThemeToggle={() => setDark(!dark)} onMobileMenu={() => setMobileOpen(true)} labels={availableLabels} notifications={notifications} onOpenNotification={(notification) => { setActiveBoardLocal(notification.boardId); setActiveTaskId(notification.taskId); }} />
@@ -143,7 +143,7 @@ export function DashboardApp({ initialSnapshot }: { initialSnapshot: WorkspaceSn
           <section className="board-header">
             <div className="board-title-block">
               <div className="board-icon" style={{ background: board.color }}><LayoutGrid size={20} /></div>
-              <div><div className="board-title-row"><h1>{board.title}</h1>{access.canEditWorkspace && <button className="icon-button small" onClick={() => { setManagedBoardId(board.id); setBoardDialogOpen(true); }} aria-label="Настройки доски"><MoreHorizontal size={18} /></button>}</div><p>{board.description}</p></div>
+              <div><div className="board-title-row"><h1>{board.title}</h1>{access.canManageBoards && <button className="icon-button small" onClick={() => { setManagedBoardId(board.id); setBoardDialogOpen(true); }} aria-label="Настройки доски"><MoreHorizontal size={18} /></button>}</div><p>{board.description}</p></div>
             </div>
             <div className="board-summary">
               <div className={`stat saved ${saveError ? "save-failed" : ""}`} title={saveError ?? undefined}><HardDrive size={16} /><span>{saveError ? "Ошибка сохранения" : saving ? "Сохраняем…" : "Сохранено"}</span></div>
@@ -158,7 +158,7 @@ export function DashboardApp({ initialSnapshot }: { initialSnapshot: WorkspaceSn
               <button className={`icon-button ${compact ? "selected" : ""}`} onClick={() => setCompact(!compact)} aria-label="Переключить плотность" disabled={viewMode === "list"}><Rows3 size={17} /></button>
             </div>
           </section>
-          {viewMode === "board" ? <BoardCanvas boardId={board.id} search={search} filters={filters} onOpenTask={setActiveTaskId} sort={sort} canEdit={access.canEditWorkspace} /> : <TaskTable boardId={board.id} search={search} filters={filters} onOpenTask={setActiveTaskId} sort={sort} />}
+          {viewMode === "board" ? <BoardCanvas boardId={board.id} search={search} filters={filters} onOpenTask={setActiveTaskId} sort={sort} canEdit={access.canEditWorkspace} canEditDeadlines={access.canEditDeadlines} /> : <TaskTable boardId={board.id} search={search} filters={filters} onOpenTask={setActiveTaskId} sort={sort} />}
         </main>
       </div>
       {activeTaskId && <TaskModal key={activeTaskId} taskId={activeTaskId} onClose={() => setActiveTaskId(null)} canEdit={access.canEditWorkspace} canEditDeadlines={access.canEditDeadlines} currentUser={currentUser} />}

@@ -3,11 +3,21 @@ export type TaskStatus = "backlog" | "in-progress" | "review" | "done";
 export type EmployeeStatus = "active" | "deleted";
 export type EmployeeRole = "admin" | "member" | "guest";
 
+export interface CommentAttachment {
+  id: string;
+  name: string;
+  type: "image/png" | "image/jpeg" | "image/webp";
+  dataUrl: string;
+  size: number;
+}
+
 export interface Comment {
   id: string;
   author: string;
   text: string;
   createdAt: string;
+  mentionIds: string[];
+  attachments: CommentAttachment[];
 }
 export interface Employee {
   id: string;
@@ -17,6 +27,7 @@ export interface Employee {
   status: EmployeeStatus;
   role: EmployeeRole;
   canEditDeadlines: boolean;
+  boardIds: string[];
   createdAt: string;
   deletedAt?: string;
 }
@@ -37,8 +48,6 @@ export interface Task {
   labels: string[];
   assigneeIds: string[];
   comments: Comment[];
-  notes: string;
-  pinned: boolean;
   closed: boolean;
   archived: boolean;
   createdAt: string;
@@ -77,7 +86,6 @@ export interface TaskDraft {
   dueDate?: string;
   labels: string[];
   assigneeIds: string[];
-  notes: string;
 }
 
 export interface SessionUser {
@@ -87,6 +95,7 @@ export interface SessionUser {
   email?: string;
   role: EmployeeRole;
   canEditDeadlines: boolean;
+  boardIds: string[];
 }
 
 export interface WorkspaceSnapshot {

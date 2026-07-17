@@ -15,6 +15,7 @@ await sql`
     password_salt TEXT,
     role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'member', 'guest')),
     can_edit_deadlines BOOLEAN NOT NULL DEFAULT TRUE,
+    board_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'deleted')),
     failed_attempts INTEGER NOT NULL DEFAULT 0,
     locked_until TIMESTAMPTZ,
@@ -23,6 +24,7 @@ await sql`
   )
 `;
 await sql`ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_edit_deadlines BOOLEAN NOT NULL DEFAULT TRUE`;
+await sql`ALTER TABLE employees ADD COLUMN IF NOT EXISTS board_ids JSONB`;
 await sql`ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_role_check`;
 await sql`ALTER TABLE employees ADD CONSTRAINT employees_role_check CHECK (role IN ('admin', 'member', 'guest'))`;
 await sql`UPDATE employees SET can_edit_deadlines = TRUE WHERE role = 'admin'`;
@@ -49,6 +51,18 @@ await sql`
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )
 `;
+await sql`
+  UPDATE employees
+  SET board_ids = COALESCE((
+    SELECT jsonb_agg(board_id)
+    FROM workspaces w
+    CROSS JOIN LATERAL jsonb_object_keys(w.data->'boards') AS board_id
+    WHERE w.id = 'main'
+  ), '[]'::jsonb)
+  WHERE board_ids IS NULL
+`;
+await sql`ALTER TABLE employees ALTER COLUMN board_ids SET DEFAULT '[]'::jsonb`;
+await sql`ALTER TABLE employees ALTER COLUMN board_ids SET NOT NULL`;
 
 console.log("Database schema is ready");
 }
