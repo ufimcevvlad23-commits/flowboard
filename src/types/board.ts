@@ -102,6 +102,7 @@ export interface WorkspaceSnapshot {
   workspace: WorkspaceData;
   version: number;
   currentUser: SessionUser;
+  readNotificationIds: string[];
 }
 
 export interface Filters {

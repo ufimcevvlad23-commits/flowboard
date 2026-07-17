@@ -19,12 +19,14 @@ await sql`
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'deleted')),
     failed_attempts INTEGER NOT NULL DEFAULT 0,
     locked_until TIMESTAMPTZ,
+    read_notification_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     deleted_at TIMESTAMPTZ
   )
 `;
 await sql`ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_edit_deadlines BOOLEAN NOT NULL DEFAULT TRUE`;
 await sql`ALTER TABLE employees ADD COLUMN IF NOT EXISTS board_ids JSONB`;
+await sql`ALTER TABLE employees ADD COLUMN IF NOT EXISTS read_notification_ids JSONB NOT NULL DEFAULT '[]'::jsonb`;
 await sql`ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_role_check`;
 await sql`ALTER TABLE employees ADD CONSTRAINT employees_role_check CHECK (role IN ('admin', 'member', 'guest'))`;
 await sql`UPDATE employees SET can_edit_deadlines = TRUE WHERE role = 'admin'`;

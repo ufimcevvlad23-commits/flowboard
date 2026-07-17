@@ -39,6 +39,7 @@ export function DashboardApp({ initialSnapshot }: { initialSnapshot: WorkspaceSn
   const [managedBoardId, setManagedBoardId] = useState<string | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
+  const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(() => new Set(initialSnapshot.readNotificationIds));
   const activeBoardId = useBoardStore((state) => state.activeBoardId);
   const boards = useBoardStore((state) => state.boards);
   const board = useBoardStore((state) => state.boards[activeBoardId]);
@@ -115,6 +116,19 @@ export function DashboardApp({ initialSnapshot }: { initialSnapshot: WorkspaceSn
     return result.sort((a, b) => rank[a.kind] - rank[b.kind] || a.title.localeCompare(b.title, "ru")).slice(0, 30);
   }, [boards, currentUser.id, currentUser.name, lists, tasks]);
 
+  const markNotificationRead = (notification: TaskNotification) => {
+    if (readNotificationIds.has(notification.id)) return;
+    setReadNotificationIds((current) => new Set(current).add(notification.id));
+    void fetch("/api/notifications/read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationId: notification.id }),
+    }).then((response) => {
+      if (response.status === 401) window.location.assign("/login");
+      if (!response.ok) setReadNotificationIds((current) => { const next = new Set(current); next.delete(notification.id); return next; });
+    }).catch(() => setReadNotificationIds((current) => { const next = new Set(current); next.delete(notification.id); return next; }));
+  };
+
   if (!mounted || !hydrated) return <div className="app-loading"><div className="loading-logo">F</div><div className="loading-line" /><span>Загружаем защищённое рабочее пространство…</span></div>;
 
   if (!board) return (
@@ -126,7 +140,7 @@ export function DashboardApp({ initialSnapshot }: { initialSnapshot: WorkspaceSn
       <Sidebar currentUser={currentUser} canEdit={access.canEditWorkspace} canManageBoards={access.canManageBoards} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onCreateBoard={() => { setManagedBoardId(null); setBoardDialogOpen(true); }} onManageBoard={(id) => { setManagedBoardId(id); setBoardDialogOpen(true); }} onOpenArchive={() => setArchiveOpen(true)} />
       {mobileOpen && <button className="mobile-overlay" onClick={() => setMobileOpen(false)} aria-label="Закрыть меню" />}
       <div className="workspace">
-        <Topbar currentUser={currentUser} search={search} onSearch={setSearch} filters={filters} onFilters={setFilters} filterOpen={filterOpen} onFilterOpen={setFilterOpen} dark={dark} onThemeToggle={() => setDark(!dark)} onMobileMenu={() => setMobileOpen(true)} labels={availableLabels} notifications={notifications} onOpenNotification={(notification) => { setActiveBoardLocal(notification.boardId); setActiveTaskId(notification.taskId); }} />
+        <Topbar currentUser={currentUser} search={search} onSearch={setSearch} filters={filters} onFilters={setFilters} filterOpen={filterOpen} onFilterOpen={setFilterOpen} dark={dark} onThemeToggle={() => setDark(!dark)} onMobileMenu={() => setMobileOpen(true)} labels={availableLabels} notifications={notifications} readNotificationIds={readNotificationIds} onReadNotification={markNotificationRead} onOpenNotification={(notification) => { setActiveBoardLocal(notification.boardId); setActiveTaskId(notification.taskId); }} />
         <main className="board-view">
           <section className="board-header">
             <div className="board-title-block">

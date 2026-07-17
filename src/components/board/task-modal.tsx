@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- comment screenshots are user-provided data URLs */
 
 import { useEffect, useRef, useState, type ChangeEvent, type ClipboardEvent as ReactClipboardEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, Archive, Check, CircleCheck, Eye, Flag, MessageSquare, Paperclip, Plus, RotateCcw, Tag, Trash2, UserRoundPlus, X } from "lucide-react";
 import { formatDistanceToNow, isBefore, startOfToday } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -66,6 +67,7 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines, currentU
   const [draft, setDraft] = useState<TaskDraft>(() => task ? ({ title: task.title, checklist: task.checklist ?? [], priority: task.priority, status: task.status, dueDate: task.dueDate, labels: task.labels, assigneeIds: task.assigneeIds ?? [] }) : ({ title: "", checklist: [], priority: "medium", status: "backlog", labels: [], assigneeIds: [] }));
   const [comment, setComment] = useState("");
   const [attachments, setAttachments] = useState<CommentAttachment[]>([]);
+  const [previewAttachment, setPreviewAttachment] = useState<CommentAttachment | null>(null);
   const [mentionIds, setMentionIds] = useState<string[]>([]);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionStart, setMentionStart] = useState<number | null>(null);
@@ -79,12 +81,19 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines, currentU
   const taskExists = Boolean(task);
 
   useEffect(() => {
-    if (!taskExists || !canEdit) return;
+    if (!taskExists || !task || !canEdit) return;
     if (!autoSaveReady.current) { autoSaveReady.current = true; return; }
     if (!draft.title.trim() || draft.checklist.some((item) => !item.title.trim())) return;
-    const activeAssigneeIds = draft.assigneeIds.filter((id) => employees[id]?.status === "active");
-    updateTask(taskId, { ...draft, title: draft.title.trim(), checklist: draft.checklist.map((item) => ({ ...item, title: item.title.trim() })), assigneeIds: activeAssigneeIds });
-  }, [canEdit, draft, employees, taskExists, taskId, updateTask]);
+    const normalizedDraft = { ...draft, title: draft.title.trim(), checklist: draft.checklist.map((item) => ({ ...item, title: item.title.trim() })) };
+    const unchanged = normalizedDraft.title === task.title
+      && normalizedDraft.priority === task.priority
+      && normalizedDraft.status === task.status
+      && normalizedDraft.dueDate === task.dueDate
+      && JSON.stringify(normalizedDraft.labels) === JSON.stringify(task.labels)
+      && JSON.stringify(normalizedDraft.assigneeIds) === JSON.stringify(task.assigneeIds)
+      && JSON.stringify(normalizedDraft.checklist) === JSON.stringify(task.checklist);
+    if (!unchanged) updateTask(taskId, normalizedDraft);
+  }, [canEdit, draft, task, taskExists, taskId, updateTask]);
 
   if (!task) return null;
   const employeeList = Object.values(employees).filter((employee) => employee.status === "active").sort((a, b) => a.name.localeCompare(b.name, "ru"));
@@ -163,7 +172,7 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines, currentU
   };
 
   return (
-    <Modal open onClose={onClose} title="" size="lg">
+    <Modal open onClose={() => previewAttachment ? setPreviewAttachment(null) : onClose()} title="" size="lg">
       <div className="task-modal-grid">
         <div className="task-editor">
           <label className="field task-title-field"><span>Название</span><textarea rows={2} value={draft.title} readOnly={!canEdit} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} /></label>
@@ -171,7 +180,7 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines, currentU
             <SelectMenu compact iconOnly icon={<Flag size={16} style={{ color: priorityMeta[draft.priority].color }} />} title={`Приоритет: ${priorityMeta[draft.priority].label}`} value={draft.priority} disabled={!canEdit} ariaLabel="Приоритет" options={(Object.keys(priorityMeta) as Priority[]).map((value) => ({ value, label: priorityMeta[value].label }))} onChange={(value) => setDraft((current) => ({ ...current, priority: value as Priority }))} />
             <DatePicker compact iconOnly value={draft.dueDate} onChange={(dueDate) => setDraft((current) => ({ ...current, dueDate }))} disabled={!canEdit || !canEditDeadlines} disabledReason={!canEdit ? "Гостю доступен только просмотр" : "Нет права изменять дедлайны"} />
             <div className="task-tag-control"><button type="button" className={cn("task-property-button", draft.labels.length > 0 && "active")} onClick={() => setTagOpen((open) => !open)} disabled={!canEdit} aria-label="Теги задачи" aria-expanded={tagOpen}><Tag size={16} />{draft.labels.length > 0 && <b>{draft.labels.length}</b>}</button>{tagOpen && <div className="task-tag-popover"><strong>Теги</strong>{allLabels.map((label) => <button type="button" className={draft.labels.includes(label) ? "selected" : ""} key={label} onClick={() => toggleLabel(label)}><span>{label}</span>{draft.labels.includes(label) && <Check size={13} />}</button>)}{allLabels.length === 0 && <small>Тегов пока нет — создайте первый.</small>}<div><input value={newTag} onChange={(event) => setNewTag(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createLabel(); } }} placeholder="Новый тег" /><button type="button" onClick={createLabel} disabled={!newTag.trim()}><Plus size={13} /></button></div></div>}</div>
-            <div className="task-assignee-control"><button type="button" className={cn("task-property-button", assignedEmployees.length > 0 && "active")} onClick={() => setAssigneeOpen((open) => !open)} disabled={!canEdit} aria-label="Ответственные" aria-expanded={assigneeOpen}><UserRoundPlus size={16} />{assignedEmployees.length > 0 && <b>{assignedEmployees.length}</b>}</button>{assigneeOpen && <div className="task-assignee-popover"><strong>Ответственные</strong>{employeeList.map((employee) => { const selected = draft.assigneeIds.includes(employee.id); return <button type="button" className={selected ? "selected" : ""} key={employee.id} onClick={() => toggleAssignee(employee.id)}><span className="employee-avatar" style={{ background: employeeColor(employee.id) }}>{employeeInitials(employee.name)}</span><span>{employee.name}</span>{selected && <Check size={13} />}</button>; })}{employeeList.length === 0 && <small>Нет активных сотрудников</small>}{deletedAssignees.length > 0 && <small>Удалённые назначения будут сняты автоматически.</small>}</div>}</div>
+            <div className="task-assignee-control"><button type="button" className={cn("task-property-button", assignedEmployees.length > 0 && "active")} onClick={() => setAssigneeOpen((open) => !open)} disabled={!canEdit} aria-label="Ответственные" aria-expanded={assigneeOpen}><UserRoundPlus size={16} />{assignedEmployees.length > 0 && <b>{assignedEmployees.length}</b>}</button>{assigneeOpen && <div className="task-assignee-popover"><strong>Ответственные</strong>{employeeList.map((employee) => { const selected = draft.assigneeIds.includes(employee.id); return <button type="button" className={selected ? "selected" : ""} key={employee.id} onClick={() => toggleAssignee(employee.id)}><span className="employee-avatar" style={{ background: employeeColor(employee.id) }}>{employeeInitials(employee.name)}</span><span>{employee.name}</span>{selected && <Check size={13} />}</button>; })}{employeeList.length === 0 && <small>Нет активных сотрудников</small>}{deletedAssignees.length > 0 && <small>Удалённые сотрудники сохранены в истории назначения и не имеют доступа.</small>}</div>}</div>
             {assignedEmployees.map((employee) => <span className="employee-avatar task-property-avatar" style={{ background: employeeColor(employee.id) }} title={employee.name} key={employee.id}>{employeeInitials(employee.name)}</span>)}
             {draft.labels.map((label) => <span className="task-property-tag" key={label}>{label}</span>)}
           </div>
@@ -195,11 +204,12 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines, currentU
         </div>
         <aside className="activity-panel">
           <div className="activity-heading"><MessageSquare size={16} /><span>Обсуждение</span><b>{task.comments.length}</b></div>
-          <div className="comment-list">{task.comments.map((item) => <div className="comment" key={item.id}><div className="avatar small-avatar">{item.author.slice(0, 1)}</div><div><header><strong>{item.author}</strong><time>{formatDistanceToNow(new Date(item.createdAt), { addSuffix: true, locale: ru })}</time></header>{item.text && <p>{renderMentions(item.text, employeeList)}</p>}{(item.attachments ?? []).length > 0 && <div className="comment-images">{item.attachments.map((attachment) => <a href={attachment.dataUrl} target="_blank" rel="noreferrer" key={attachment.id} title={attachment.name}><img src={attachment.dataUrl} alt={attachment.name} /></a>)}</div>}</div></div>)}{task.comments.length === 0 && <div className="empty-comments">Начните обсуждение задачи</div>}</div>
+          <div className="comment-list">{task.comments.map((item) => <div className="comment" key={item.id}><div className="avatar small-avatar">{item.author.slice(0, 1)}</div><div><header><strong>{item.author}</strong><time>{formatDistanceToNow(new Date(item.createdAt), { addSuffix: true, locale: ru })}</time></header>{item.text && <p>{renderMentions(item.text, employeeList)}</p>}{(item.attachments ?? []).length > 0 && <div className="comment-images">{item.attachments.map((attachment) => <button type="button" onClick={() => setPreviewAttachment(attachment)} key={attachment.id} title={`Открыть ${attachment.name}`} aria-label={`Открыть изображение ${attachment.name}`}><img src={attachment.dataUrl} alt={attachment.name} /></button>)}</div>}</div></div>)}{task.comments.length === 0 && <div className="empty-comments">Начните обсуждение задачи</div>}</div>
           {canEdit && <div className="comment-form"><textarea ref={commentRef} value={comment} onChange={(event) => updateComment(event.target.value, event.target.selectionStart)} onPaste={pasteImages} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (mentionQuery !== null && mentionEmployees[0]) insertMention(mentionEmployees[0]); else sendComment(); } }} placeholder="Комментарий… @ — упомянуть, Ctrl+V — вставить скриншот" />{mentionQuery !== null && <div className="mention-popover"><div className="mention-title">Упомянуть сотрудника</div>{mentionEmployees.map((employee) => <button type="button" key={employee.id} onClick={() => insertMention(employee)}><span className="employee-avatar" style={{ background: employeeColor(employee.id) }}>{employeeInitials(employee.name)}</span><span><strong>{employee.name}</strong><small>{employee.email || employee.login}</small></span></button>)}{mentionEmployees.length === 0 && <span className="mention-empty">Сотрудники не найдены</span>}</div>}{attachments.length > 0 && <div className="pending-images">{attachments.map((attachment) => <div key={attachment.id}><img src={attachment.dataUrl} alt={attachment.name} /><button type="button" onClick={() => setAttachments((current) => current.filter((item) => item.id !== attachment.id))} aria-label={`Убрать ${attachment.name}`}><X size={12} /></button></div>)}</div>}<div className="comment-actions"><input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={(event) => void addImages(event)} /><button type="button" className="icon-button" onClick={() => fileInputRef.current?.click()} disabled={attachments.length >= 4} aria-label="Добавить скриншот" title="Добавить скриншот"><Paperclip size={16} /></button><button className="button secondary compact" onClick={sendComment} disabled={!comment.trim() && attachments.length === 0}>Отправить</button></div></div>}
         </aside>
       </div>
       <footer className="modal-actions task-actions">{canEdit ? <div><button className={`button ghost ${task.closed ? "reopen-task" : "close-task"}`} onClick={() => { toggleTaskClosed(task.id); toast.success(task.closed ? "Задача снова открыта" : "Задача закрыта и перемещена вниз"); onClose(); }}>{task.closed ? <RotateCcw size={15} /> : <CircleCheck size={15} />}{task.closed ? "Открыть снова" : "Закрыть задачу"}</button><button className="button ghost" onClick={() => { updateTask(task.id, { archived: true }); toast.success("Задача в архиве"); onClose(); }}><Archive size={15} />В архив</button><button className="button ghost danger-text" onClick={() => { if (window.confirm("Удалить задачу без возможности восстановления?")) { deleteTask(task.id); toast.success("Задача удалена"); onClose(); } }}><Trash2 size={15} />Удалить</button></div> : <span className="readonly-mode-note"><Eye size={14} />Только просмотр</span>}<div className="task-close-group">{canEdit && <span className="autosave-note">Изменения сохраняются автоматически</span>}<button className="button secondary" onClick={onClose}>Закрыть</button></div></footer>
+      {previewAttachment && createPortal(<div className="image-lightbox" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setPreviewAttachment(null)}><div role="dialog" aria-modal="true" aria-label={`Просмотр изображения ${previewAttachment.name}`}><header><span>{previewAttachment.name}</span><button type="button" className="icon-button" onClick={() => setPreviewAttachment(null)} aria-label="Закрыть изображение"><X size={20} /></button></header><img src={previewAttachment.dataUrl} alt={previewAttachment.name} /></div></div>, document.body)}
     </Modal>
   );
 }

@@ -46,7 +46,12 @@ export async function getEmployeeDtos() {
 
 export async function getWorkspaceSnapshotFor(user: SessionUser): Promise<WorkspaceSnapshot> {
   const sql = getSql();
-  const rows = await sql`SELECT data, version FROM workspaces WHERE id = 'main' LIMIT 1` as WorkspaceRow[];
+  const [workspaceResult, notificationResult] = await Promise.all([
+    sql`SELECT data, version FROM workspaces WHERE id = 'main' LIMIT 1`,
+    sql`SELECT read_notification_ids FROM employees WHERE id = ${user.id} LIMIT 1`,
+  ]);
+  const rows = workspaceResult as WorkspaceRow[];
+  const notificationRows = notificationResult as Array<{ read_notification_ids: unknown }>;
   if (!rows[0]) throw new Error("Workspace is not initialized");
   const employeeDtos = await getEmployeeDtos();
   const employees = user.role === "guest"
@@ -66,6 +71,7 @@ export async function getWorkspaceSnapshotFor(user: SessionUser): Promise<Worksp
   const activeBoardId = allowedBoardIds.includes(data.activeBoardId) ? data.activeBoardId : allowedBoardIds[0] ?? "";
   return {
     currentUser: user,
+    readNotificationIds: Array.isArray(notificationRows[0]?.read_notification_ids) ? notificationRows[0].read_notification_ids.filter((id): id is string => typeof id === "string") : [],
     version: Number(rows[0].version),
     workspace: { boards, lists, tasks, activeBoardId, employees },
   };

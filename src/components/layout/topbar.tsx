@@ -28,12 +28,15 @@ interface TopbarProps {
   onMobileMenu: () => void;
   labels: string[];
   notifications: TaskNotification[];
+  readNotificationIds: ReadonlySet<string>;
+  onReadNotification: (notification: TaskNotification) => void;
   onOpenNotification: (notification: TaskNotification) => void;
 }
-export function Topbar({ currentUser, search, onSearch, filters, onFilters, filterOpen, onFilterOpen, dark, onThemeToggle, onMobileMenu, labels, notifications, onOpenNotification }: TopbarProps) {
+export function Topbar({ currentUser, search, onSearch, filters, onFilters, filterOpen, onFilterOpen, dark, onThemeToggle, onMobileMenu, labels, notifications, readNotificationIds, onReadNotification, onOpenNotification }: TopbarProps) {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
   const activeCount = filters.priorities.length + (filters.label ? 1 : 0) + (filters.due !== "all" ? 1 : 0);
+  const unreadCount = notifications.filter((notification) => !readNotificationIds.has(notification.id)).length;
   const toggle = <T extends string>(items: T[], value: T) => items.includes(value) ? items.filter((item) => item !== value) : [...items, value];
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -75,8 +78,8 @@ export function Topbar({ currentUser, search, onSearch, filters, onFilters, filt
         </div>
         <button className="icon-button" onClick={onThemeToggle} aria-label={dark ? "Включить светлую тему" : "Включить тёмную тему"}>{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
         <div className="notification-wrap" ref={notificationRef}>
-          <button className="icon-button notification" onClick={() => setNotificationOpen((current) => !current)} aria-label="Уведомления" aria-expanded={notificationOpen}><Bell size={18} />{notifications.length > 0 && <b>{Math.min(notifications.length, 99)}</b>}</button>
-          {notificationOpen && <div className="notification-popover"><div className="notification-heading"><span><Bell size={15} />Уведомления</span><b>{notifications.length}</b></div><div className="notification-list">{notifications.map((notification) => <button type="button" className={`notification-item ${notification.kind}`} key={notification.id} onClick={() => { setNotificationOpen(false); onOpenNotification(notification); }}>{notification.kind === "mention" ? <AtSign size={16} /> : notification.kind === "overdue" ? <AlertTriangle size={16} /> : <CalendarClock size={16} />}<span><strong>{notification.title}</strong><small>{notification.detail}</small></span></button>)}{notifications.length === 0 && <div className="notification-empty"><Bell size={22} /><strong>Всё спокойно</strong><span>Новых уведомлений нет</span></div>}</div></div>}
+          <button className="icon-button notification" onClick={() => setNotificationOpen((current) => !current)} aria-label={unreadCount > 0 ? `Уведомления, непрочитанных: ${unreadCount}` : "Уведомления"} aria-expanded={notificationOpen}><Bell size={18} />{unreadCount > 0 && <b>{Math.min(unreadCount, 99)}</b>}</button>
+          {notificationOpen && <div className="notification-popover"><div className="notification-heading"><span><Bell size={15} />Уведомления</span><b title="Непрочитанные уведомления">{unreadCount}</b></div><div className="notification-list">{notifications.map((notification) => { const isRead = readNotificationIds.has(notification.id); return <button type="button" className={`notification-item ${notification.kind} ${isRead ? "read" : "unread"}`} key={notification.id} onClick={() => { onReadNotification(notification); setNotificationOpen(false); onOpenNotification(notification); }} aria-label={`${notification.title}. ${isRead ? "Прочитано" : "Не прочитано"}`}>{notification.kind === "mention" ? <AtSign size={16} /> : notification.kind === "overdue" ? <AlertTriangle size={16} /> : <CalendarClock size={16} />}<span><strong>{notification.title}</strong><small>{notification.detail}</small></span><i aria-hidden="true" /></button>; })}{notifications.length === 0 && <div className="notification-empty"><Bell size={22} /><strong>Всё спокойно</strong><span>Уведомлений нет</span></div>}</div></div>}
         </div>
         <div className="avatar top-avatar" title={`${currentUser.name} · ${currentUser.role === "admin" ? "Администратор" : currentUser.role === "guest" ? "Гость" : "Пользователь"}`}>{employeeInitials(currentUser.name)}</div>
         <button className="icon-button logout-button" onClick={() => void logout()} aria-label="Выйти из Flowboard" title="Выйти"><LogOut size={17} /></button>
