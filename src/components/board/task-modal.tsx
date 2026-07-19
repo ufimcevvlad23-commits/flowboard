@@ -60,6 +60,7 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines, currentU
   const task = useBoardStore((state) => taskId ? state.tasks[taskId] : undefined);
   const tasks = useBoardStore((state) => state.tasks);
   const updateTask = useBoardStore((state) => state.updateTask);
+  const deleteLabel = useBoardStore((state) => state.deleteLabel);
   const deleteTask = useBoardStore((state) => state.deleteTask);
   const addComment = useBoardStore((state) => state.addComment);
   const toggleTaskClosed = useBoardStore((state) => state.toggleTaskClosed);
@@ -79,6 +80,7 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines, currentU
   const commentRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const taskExists = Boolean(task);
+  const canDeleteLabels = currentUser.role === "admin";
 
   useEffect(() => {
     if (!taskExists || !task || !canEdit) return;
@@ -123,6 +125,12 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines, currentU
     setDraft((current) => ({ ...current, labels: current.labels.includes(label) ? current.labels : [...current.labels, label] }));
     setNewTag("");
     setTagOpen(false);
+  };
+  const removeLabel = (label: string) => {
+    if (!canDeleteLabels || !window.confirm(`Удалить тег «${label}» из всех задач?`)) return;
+    deleteLabel(label);
+    setDraft((current) => ({ ...current, labels: current.labels.filter((item) => item !== label) }));
+    toast.success(`Тег «${label}» удалён`);
   };
   const updateComment = (value: string, caret: number) => {
     setComment(value);
@@ -179,7 +187,18 @@ export function TaskModal({ taskId, onClose, canEdit, canEditDeadlines, currentU
           <div className="task-property-bar" aria-label="Свойства задачи">
             <SelectMenu compact iconOnly icon={<Flag size={16} style={{ color: priorityMeta[draft.priority].color }} />} title={`Приоритет: ${priorityMeta[draft.priority].label}`} value={draft.priority} disabled={!canEdit} ariaLabel="Приоритет" options={(Object.keys(priorityMeta) as Priority[]).map((value) => ({ value, label: priorityMeta[value].label }))} onChange={(value) => setDraft((current) => ({ ...current, priority: value as Priority }))} />
             <DatePicker compact iconOnly value={draft.dueDate} onChange={(dueDate) => setDraft((current) => ({ ...current, dueDate }))} disabled={!canEdit || !canEditDeadlines} disabledReason={!canEdit ? "Гостю доступен только просмотр" : "Нет права изменять дедлайны"} />
-            <div className="task-tag-control"><button type="button" className={cn("task-property-button", draft.labels.length > 0 && "active")} onClick={() => setTagOpen((open) => !open)} disabled={!canEdit} aria-label="Теги задачи" aria-expanded={tagOpen}><Tag size={16} />{draft.labels.length > 0 && <b>{draft.labels.length}</b>}</button>{tagOpen && <div className="task-tag-popover"><strong>Теги</strong>{allLabels.map((label) => <button type="button" className={draft.labels.includes(label) ? "selected" : ""} key={label} onClick={() => toggleLabel(label)}><span>{label}</span>{draft.labels.includes(label) && <Check size={13} />}</button>)}{allLabels.length === 0 && <small>Тегов пока нет — создайте первый.</small>}<div><input value={newTag} onChange={(event) => setNewTag(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createLabel(); } }} placeholder="Новый тег" /><button type="button" onClick={createLabel} disabled={!newTag.trim()}><Plus size={13} /></button></div></div>}</div>
+            <div className="task-tag-control">
+              <button type="button" className={cn("task-property-button", draft.labels.length > 0 && "active")} onClick={() => setTagOpen((open) => !open)} disabled={!canEdit} aria-label="Теги задачи" aria-expanded={tagOpen}><Tag size={16} />{draft.labels.length > 0 && <b>{draft.labels.length}</b>}</button>
+              {tagOpen && <div className="task-tag-popover">
+                <strong>Теги</strong>
+                {allLabels.map((label) => <div className="task-tag-option" key={label}>
+                  <button type="button" className={draft.labels.includes(label) ? "selected" : ""} onClick={() => toggleLabel(label)}><span>{label}</span>{draft.labels.includes(label) && <Check size={13} />}</button>
+                  {canDeleteLabels && <button type="button" className="task-tag-delete" onClick={() => removeLabel(label)} title={`Удалить тег «${label}»`} aria-label={`Удалить тег «${label}»`}><Trash2 size={12} /></button>}
+                </div>)}
+                {allLabels.length === 0 && <small>Тегов пока нет — создайте первый.</small>}
+                <div className="task-tag-create"><input value={newTag} onChange={(event) => setNewTag(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createLabel(); } }} placeholder="Новый тег" /><button type="button" onClick={createLabel} disabled={!newTag.trim()}><Plus size={13} /></button></div>
+              </div>}
+            </div>
             <div className="task-assignee-control"><button type="button" className={cn("task-property-button", assignedEmployees.length > 0 && "active")} onClick={() => setAssigneeOpen((open) => !open)} disabled={!canEdit} aria-label="Ответственные" aria-expanded={assigneeOpen}><UserRoundPlus size={16} />{assignedEmployees.length > 0 && <b>{assignedEmployees.length}</b>}</button>{assigneeOpen && <div className="task-assignee-popover"><strong>Ответственные</strong>{employeeList.map((employee) => { const selected = draft.assigneeIds.includes(employee.id); return <button type="button" className={selected ? "selected" : ""} key={employee.id} onClick={() => toggleAssignee(employee.id)}><span className="employee-avatar" style={{ background: employeeColor(employee.id) }}>{employeeInitials(employee.name)}</span><span>{employee.name}</span>{selected && <Check size={13} />}</button>; })}{employeeList.length === 0 && <small>Нет активных сотрудников</small>}{deletedAssignees.length > 0 && <small>Удалённые сотрудники сохранены в истории назначения и не имеют доступа.</small>}</div>}</div>
             {assignedEmployees.map((employee) => <span className="employee-avatar task-property-avatar" style={{ background: employeeColor(employee.id) }} title={employee.name} key={employee.id}>{employeeInitials(employee.name)}</span>)}
             {draft.labels.map((label) => <span className="task-property-tag" key={label}>{label}</span>)}

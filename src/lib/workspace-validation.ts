@@ -125,3 +125,12 @@ export function deadlinesChanged(
   }
   return false;
 }
+
+export function removedWorkspaceLabels(
+  previous: Omit<WorkspaceData, "employees">,
+  next: Omit<WorkspaceData, "employees">,
+) {
+  const previousLabels = new Set(Object.values(previous.tasks).flatMap((task) => task.labels));
+  const nextLabels = new Set(Object.values(next.tasks).flatMap((task) => task.labels));
+  return [...previousLabels].filter((label) => !nextLabels.has(label));
+}

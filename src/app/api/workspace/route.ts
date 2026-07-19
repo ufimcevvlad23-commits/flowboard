@@ -3,7 +3,7 @@ import { getAuthorizedWorkspaceSnapshot } from "@/lib/dal";
 import { getSql } from "@/lib/db";
 import { hasSameOrigin, noStoreJson } from "@/lib/http-security";
 import { getAccess } from "@/lib/permissions";
-import { deadlinesChanged, sanitizeWorkspacePayload } from "@/lib/workspace-validation";
+import { deadlinesChanged, removedWorkspaceLabels, sanitizeWorkspacePayload } from "@/lib/workspace-validation";
 import type { WorkspaceData } from "@/types/board";
 
 export async function GET() {
@@ -57,6 +57,9 @@ export async function PUT(request: Request) {
 
   if (!access.canEditDeadlines) {
     if (deadlinesChanged(current.data, workspace)) return noStoreJson({ error: "У вас нет права изменять дедлайны" }, { status: 403 });
+  }
+  if (!access.isAdmin && removedWorkspaceLabels(current.data, workspace).length > 0) {
+    return noStoreJson({ error: "Удалять теги может только администратор" }, { status: 403 });
   }
   const result = await sql`
     UPDATE workspaces

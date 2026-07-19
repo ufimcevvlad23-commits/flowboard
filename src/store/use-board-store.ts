@@ -24,6 +24,7 @@ interface BoardState extends WorkspaceData {
   upsertEmployee: (employee: Employee) => void;
   createTask: (listId: string, title: string) => string;
   updateTask: (id: string, updates: Partial<TaskDraft & Pick<Task, "closed" | "archived">>) => void;
+  deleteLabel: (label: string) => void;
   toggleTaskClosed: (taskId: string) => void;
   deleteTask: (taskId: string) => void;
   moveTask: (taskId: string, fromListId: string, toListId: string, overTaskId?: string) => void;
@@ -147,6 +148,12 @@ export const useBoardStore = create<BoardState>((set, get) => {
       return id;
     },
     updateTask: (id, updates) => mutate((state) => ({ tasks: { ...state.tasks, [id]: { ...state.tasks[id], ...updates } } })),
+    deleteLabel: (label) => mutate((state) => ({
+      tasks: Object.fromEntries(Object.entries(state.tasks).map(([id, task]) => [id, {
+        ...task,
+        labels: task.labels.filter((item) => item !== label),
+      }])),
+    })),
     toggleTaskClosed: (taskId) => mutate((state) => {
       const task = state.tasks[taskId];
       if (!task) return state;
